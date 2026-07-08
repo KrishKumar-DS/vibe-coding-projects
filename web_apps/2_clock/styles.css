@@ -1,0 +1,123 @@
+:root {
+  --bg: #0a0a0f;
+  --bg-2: #14141c;
+  --ink: #e8e8ee;
+  --ink-dim: #7a7a88;
+  --stroke-thin: 2px;
+  --stroke-thick: 4px;
+  --c-hours-base: #9b6dff;
+  --c-hours-bright: #c9a8ff;
+  --c-hours-dim: #5a3da6;
+  --c-minutes-base: #46d3ff;
+  --c-minutes-bright: #9be9ff;
+  --c-minutes-dim: #1f7fa3;
+  --c-seconds-base: #ffb347;
+  --c-seconds-bright: #ffe0a8;
+  --c-seconds-dim: #a06a1f;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.clock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 4vw, 48px);
+}
+
+.ring {
+  position: relative;
+  width: clamp(120px, 24vmin, 180px);
+  aspect-ratio: 1;
+}
+
+@media (max-width: 480px) {
+  .clock {
+    flex-direction: column;
+    gap: clamp(8px, 1.5vh, 20px);
+  }
+
+  .ring {
+    width: min(70vw, 30vh);
+  }
+
+  .ring__value {
+    font-size: min(14vw, 7vh);
+  }
+
+  .ring__label {
+    font-size: min(3vw, 1.5vh);
+    bottom: 10%;
+  }
+}
+
+.ring__track {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.ring__perimeter {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--phase, 0deg),
+    var(--accent-bright) 0deg,
+    var(--accent) 60deg,
+    var(--accent-dim) 180deg,
+    transparent 300deg
+  );
+  -webkit-mask: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - var(--stroke) - 1px),
+    #000 calc(100% - var(--stroke))
+  );
+  mask: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - var(--stroke) - 1px),
+    #000 calc(100% - var(--stroke))
+  );
+  will-change: transform;
+}
+
+.ring__value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: clamp(28px, 6vmin, 48px);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.ring__label {
+  position: absolute;
+  bottom: 14%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: clamp(10px, 1.6vmin, 12px);
+  letter-spacing: 0.25em;
+  color: var(--ink-dim);
+}
+
+.ring--hours { --stroke: var(--stroke-thick); }
+.ring--hours { --accent: var(--c-hours-base); --accent-bright: var(--c-hours-bright); --accent-dim: var(--c-hours-dim); }
+.ring--minutes { --stroke: calc(var(--stroke-thick) * 0.8); }
+.ring--minutes { --accent: var(--c-minutes-base); --accent-bright: var(--c-minutes-bright); --accent-dim: var(--c-minutes-dim); }
+.ring--seconds { --stroke: calc(var(--stroke-thin) * 0.9); }
+.ring--seconds { --accent: var(--c-seconds-base); --accent-bright: var(--c-seconds-bright); --accent-dim: var(--c-seconds-dim); }

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="calculator">
+        <header>
+            <span class="logo">Calculator</span>
+            <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">🌙</button>
+        </header>
+        <div class="display">
+            <div class="result" id="result">0</div>
+            <div class="expression" id="expression">&nbsp;</div>
+        </div>
+        <div class="buttons">
+            <button class="btn func" data-action="clear">C</button>
+            <button class="btn func" data-action="backspace">⌫</button>
+            <button class="btn func" data-action="percent">%</button>
+            <button class="btn op" data-action="divide">÷</button>
+
+            <button class="btn num" data-value="7">7</button>
+            <button class="btn num" data-value="8">8</button>
+            <button class="btn num" data-value="9">9</button>
+            <button class="btn op" data-action="multiply">×</button>
+
+            <button class="btn num" data-value="4">4</button>
+            <button class="btn num" data-value="5">5</button>
+            <button class="btn num" data-value="6">6</button>
+            <button class="btn op" data-action="subtract">−</button>
+
+            <button class="btn num" data-value="1">1</button>
+            <button class="btn num" data-value="2">2</button>
+            <button class="btn num" data-value="3">3</button>
+            <button class="btn op" data-action="add">+</button>
+
+            <button class="btn func" data-action="sqrt">√</button>
+            <button class="btn func" data-action="square">x²</button>
+            <button class="btn func" data-action="half">½</button>
+            <button class="btn equals" data-action="equals">=</button>
+
+            <button class="btn num span-two" data-value="0">0</button>
+            <button class="btn num" data-value=".">.</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
