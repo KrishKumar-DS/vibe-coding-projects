@@ -4,6 +4,13 @@ A simple calculator web application built using HTML, CSS, and JavaScript.
 
 ---
 
+## Date
+
+* **Started:** 2026-07-07
+* **Completed:** 2026-07-07
+
+---
+
 ## Features
 
 - Basic arithmetic operations
