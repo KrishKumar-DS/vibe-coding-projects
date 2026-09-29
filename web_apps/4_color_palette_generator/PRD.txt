@@ -1,0 +1,31 @@
+Product: Color Palette Generator
+
+Goal:
+Create a simple web app that generates color palettes
+for designers/developers.
+
+Core features:
+1. Generate 5 random colors
+2. Display HEX values
+3. Copy individual HEX values
+4. Generate a new palette
+5. Lock individual colors
+6. Keep locked colors when regenerating
+
+UI:
+- Dark theme
+- 5 large color cards
+- HEX value shown on each card
+- Copy button
+- Generate button
+
+Constraints:
+- HTML + CSS + JavaScript only
+- No frameworks
+- No backend
+- Responsive on desktop and mobile
+
+Success criteria:
+- User can generate a palette in one click
+- User can copy any color
+- Locked colors remain unchanged
