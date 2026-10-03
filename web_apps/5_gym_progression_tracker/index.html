@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gym Progression Tracker</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen">
+      <header>
+        <h1>Gym Progression Tracker</h1>
+      </header>
+      <main class="home-content">
+        <section class="today-info">
+          <div class="date-display">
+            <span id="current-day" class="day-name"></span>
+            <span id="current-date" class="date"></span>
+          </div>
+          <p id="workout-status" class="status-display">Not Started</p>
+        </section>
+
+        <section class="day-selector">
+          <h3>Select a Day</h3>
+          <div id="day-strip" class="day-strip"></div>
+        </section>
+
+        <section class="quick-start">
+          <button id="start-workout-btn" class="start-workout-btn">Start Today's Workout</button>
+        </section>
+      </main>
+    </div>
+
+    <!-- Workout Screen -->
+    <div id="workout-screen" class="screen">
+      <header>
+        <button id="back-home-btn" class="back-home-btn">← Home</button>
+        <div class="workout-header-mobile">
+          <span id="workout-name" class="workout-name"></span>
+        </div>
+        <div class="day-strip-wrapper">
+          <div id="day-strip" class="day-strip"></div>
+        </div>
+      </header>
+      
+      <main class="workout-content">
+        <div class="workout-summary">
+          <div id="workout-status" class="status">Not Started</div>
+        </div>
+
+        <section class="resistance-training">
+          <h3>RESISTANCE TRAINING</h3>
+          <div id="exercises-list" class="exercises-list">
+            <!-- Exercises injected by JS -->
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- History Screen (simplified - not used in V1 Step 1) -->
+    <div id="history-screen" class="screen">
+      <header>
+        <button class="back-home-btn">← Home</button>
+        <h1>Workout History</h1>
+      </header>
+      
+      <main class="history-content">
+        <div class="empty-state" id="no-history">
+          No workouts recorded yet.
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
