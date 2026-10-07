@@ -63,32 +63,192 @@ The application should reduce the amount of information the user has to remember
 
 ---
 
-# 4. Target User
+# 4. Target Platform
 
-V1 has one target user:
+V1 is designed primarily for **desktop and laptop use**.
 
-**The person using this application to follow and track their own gym routine.**
+### Platform Priority
 
-The application is therefore optimized for:
+1. Desktop — Primary
+2. Laptop — Primary
+3. Tablet — Secondary
+4. Mobile — Not a V1 requirement
 
-* simplicity,
-* speed,
-* mobile-friendly usage,
-* low friction,
-* personal tracking.
+The application should make effective use of larger desktop screens while remaining structurally responsive enough that the interface does not break on smaller screens.
 
-V1 does **not** need:
-
-* user accounts,
-* multiple users,
-* social features,
-* cloud synchronization,
-* trainer accounts,
-* subscriptions.
+V1 does not require mobile-first optimization.
 
 ---
 
-# 5. Training Schedule
+# 5. UI Requirements
+
+The interface should be:
+
+* Clean
+* Simple
+* Fast
+* Easy to understand
+* Keyboard-friendly where practical
+* Comfortable for extended desktop use
+* Visually organized
+* Focused on workout logging rather than decoration
+
+The application should minimize unnecessary navigation and interactions.
+
+The user should be able to record a workout without repeatedly switching between screens.
+
+---
+
+# 6. Desktop Layout
+
+The primary application layout may use:
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Gym Progression Tracker                    Date / Day        │
+├──────────────┬───────────────────────────────────────────────┤
+│              │                                               │
+│ Dashboard    │              Main Content                     │
+│ Workout      │                                               │
+│ History      │                                               │
+│              │                                               │
+└──────────────┴───────────────────────────────────────────────┘
+```
+
+The exact visual design is an implementation decision.
+
+The application should prioritize:
+
+1. Workout information
+2. Previous performance
+3. Set logging
+4. Workout status
+5. Navigation
+
+over decorative UI elements.
+
+---
+
+# 7. Responsive Design
+
+Responsive behavior is desirable but secondary to the desktop experience.
+
+The application must not become unusable when the browser window is reduced in width.
+
+Mobile-specific optimization is outside the scope of V1. The UI should not be designed around mobile-first interaction.
+
+---
+
+# 8. V1 Scope
+
+V1 is a personal workout logging application.
+
+The primary responsibility of V1 is:
+
+> **Tell the user what workout they planned, allow them to record what they actually performed, and preserve that information for future reference.**
+
+V1 prioritizes:
+
+1. Logging
+2. Recall
+3. Consistency
+4. Basic progress visibility
+
+---
+
+## V1 Includes
+
+* Six-day workout schedule
+* Sunday rest-day state
+* Automatic current-day detection
+* Manual workout-day selection
+* Workout templates
+* Workout sessions
+* Warm-up tracking
+* Exercise logging
+* Set logging
+* Weight and rep tracking
+* Exercise alternatives
+* Previous workout performance
+* Cardio logging
+* Workout notes
+* Workout timer
+* Workout summary
+* Workout history
+* Previous workout detail
+* LocalStorage persistence
+* Active workout restoration
+* Input validation
+* Basic error handling
+* Data export/import
+
+---
+
+## V1 Does Not Include
+
+### Accounts
+
+* Login
+* Signup
+* User accounts
+
+### Backend
+
+* Flask
+* FastAPI
+* Node.js backend
+* REST API
+
+### Database
+
+* PostgreSQL
+* MySQL
+* MongoDB
+
+### Cloud
+
+* Cloud synchronization
+* Multi-device synchronization
+
+### Social
+
+* Friends
+* Followers
+* Leaderboards
+* Social sharing
+
+### Nutrition
+
+* Calories
+* Protein
+* Meal tracking
+* Supplement tracking
+
+### Body Tracking
+
+* Body weight
+* Waist measurements
+* Body-fat percentage
+* Progress photos
+
+### Advanced Analytics
+
+* Advanced progression algorithms
+* Plateau detection
+* Advanced muscle-volume analysis
+* Advanced 1RM analysis
+
+### AI
+
+* AI coaching
+* AI-generated workout recommendations
+* AI-generated training plans
+
+These features may be considered in later versions.
+
+---
+
+# 9. Training Schedule
 
 The application uses the following weekly structure.
 
@@ -170,11 +330,11 @@ Sunday is a:
 
 **Full Rest + Walking Day**
 
-No resistance-training workout is scheduled.
+No resistance-training workout is scheduled. Optional walking may be recorded as cardio if the user chooses.
 
 ---
 
-# 6. V1 Core User Flow
+# 10. V1 Core User Flow
 
 The main user flow should be:
 
@@ -202,7 +362,7 @@ Workout History
 
 ---
 
-# 7. Functional Requirements
+# 11. Functional Requirements
 
 ## FR-01 — Current Date and Day
 
@@ -224,7 +384,7 @@ The user should not need to manually enter the date for a normal workout.
 
 ---
 
-# 8. FR-02 — Today's Workout
+## FR-02 — Today's Workout
 
 The application must automatically load the workout associated with the current day.
 
@@ -248,7 +408,7 @@ The application must display:
 
 ---
 
-# 9. FR-03 — Manual Day Selection
+## FR-03 — Manual Day Selection
 
 The user must also be able to select another day manually.
 
@@ -281,7 +441,7 @@ Changing the displayed day must **not automatically create a workout record**.
 
 ---
 
-# 10. FR-04 — Warm-Up
+## FR-04 — Warm-Up
 
 Each workout day must contain a warm-up section.
 
@@ -307,7 +467,7 @@ Warm-up completion is stored as part of the workout session.
 
 ---
 
-# 11. FR-05 — Resistance Training
+## FR-05 — Resistance Training
 
 The application must display every exercise assigned to the selected workout.
 
@@ -349,13 +509,13 @@ Notes:
 
 ---
 
-# 12. FR-06 — Set Logging
+## FR-06 — Set Logging
 
 Every programmed set must have independent input fields for:
 
 * Weight
 * Reps
-* Sets
+* Set number (managed by the interface)
 
 Example:
 
@@ -375,7 +535,7 @@ The user must be able to record different values for each set.
 
 ---
 
-# 13. FR-07 — Exercise Replacement
+## FR-07 — Exercise Replacement
 
 The user must be able to replace a programmed exercise with an alternative.
 
@@ -414,7 +574,7 @@ This is important for maintaining accurate workout history.
 
 ---
 
-# 14. FR-08 — Exercise Alternatives
+## FR-08 — Exercise Alternatives
 
 V1 must contain predefined alternatives for exercises where alternatives are useful.
 
@@ -448,7 +608,7 @@ The alternatives should come from the application's exercise data rather than be
 
 ---
 
-# 15. FR-09 — Exercise Replacement Rules
+## FR-09 — Exercise Replacement Rules
 
 Replacing an exercise must:
 
@@ -477,9 +637,9 @@ Actual:
 
 ---
 
-# 16. FR-10 — Cardio
+## FR-10 — Cardio
 
-Each workout must include a cardio section.
+Each workout should provide a cardio section. Cardio logging is optional for a workout session.
 
 The user must be able to record:
 
@@ -510,7 +670,7 @@ Not every field needs to be mandatory.
 
 ---
 
-# 17. FR-11 — Workout Notes
+## FR-11 — Workout Notes
 
 The user must be able to add general workout notes.
 
@@ -528,7 +688,7 @@ These notes must be stored with the workout session.
 
 ---
 
-# 18. FR-12 — Workout Completion
+## FR-12 — Workout Completion
 
 The application must provide a clear way to finish a workout.
 
@@ -554,7 +714,24 @@ Before saving, the application should provide a summary.
 
 ---
 
-# 19. FR-13 — Workout Summary
+## FR-13 — Workout Timer
+
+The application should provide a workout timer for the active session.
+
+The timer must:
+
+* Start when the user starts the workout.
+* Continue while the workout is in progress.
+* Display elapsed time.
+* Stop when the workout is completed.
+* Preserve the session duration when the workout is saved.
+* Restore the timer state when an active workout is restored after refresh, where technically reliable.
+
+The timer is for tracking session duration only. It is not a rest timer or exercise-specific interval timer in V1.
+
+---
+
+## FR-14 — Workout Summary
 
 Before final save:
 
@@ -578,7 +755,7 @@ The user must be able to return to editing before saving.
 
 ---
 
-# 20. FR-14 — Workout History
+## FR-15 — Workout History
 
 The application must provide a history page.
 
@@ -610,7 +787,7 @@ Completed
 
 ---
 
-# 21. FR-15 — View Previous Workout
+## FR-16 — View Previous Workout
 
 The user must be able to open a saved workout.
 
@@ -630,7 +807,7 @@ The detail view should display:
 
 ---
 
-# 22. FR-16 — Previous Performance
+## FR-17 — Previous Performance
 
 When performing an exercise that has historical data, the application should display the most recent performance.
 
@@ -657,7 +834,32 @@ V1 does not automatically prescribe the next weight.
 
 ---
 
-# 23. FR-17 — Data Persistence
+## FR-18 — Data Persistence
+
+## FR-19 — Data Export and Import
+
+The user must be able to export workout data to a portable file and import a previously exported file.
+
+V1 export/import must:
+
+1. Export completed workout history and relevant application data.
+2. Produce a format that can be stored outside the browser.
+3. Validate imported data before replacing or merging local data.
+4. Require deliberate user confirmation before destructive replacement.
+5. Preserve historical workout records after a successful import.
+
+Example controls:
+
+```text
+[ Export Data ]
+[ Import Data ]
+```
+
+Import/export is a backup and portability mechanism, not cloud synchronization.
+
+---
+
+
 
 Workout data must survive:
 
@@ -673,11 +875,29 @@ No server/database is required.
 
 ---
 
-# 24. FR-18 — Data Model
+# 12. Data Model
 
-The application should conceptually maintain the following entities.
+The application should separate static workout programming from recorded workout history.
+
+The core relationship is:
+
+```text
+Exercise Database
+       ↓
+Workout Template
+       ↓
+Workout Session
+       ↓
+Exercise Performance
+       ↓
+Set
+```
+
+---
 
 ## Exercise
+
+Represents an exercise known by the application.
 
 ```text
 id
@@ -689,21 +909,65 @@ defaultRepRange
 alternatives[]
 ```
 
+### Rules
+
+* `id` must be stable and unique.
+* Historical records should reference exercises using their ID.
+* The display name may change without breaking historical records.
+
+Example:
+
+```javascript
+{
+    id: "machine_chest_press",
+    name: "Machine Chest Press",
+    muscleGroup: "Chest",
+    equipment: "Machine",
+    category: "Compound",
+    defaultRepRange: "8-12",
+    alternatives: [
+        "dumbbell_bench_press",
+        "barbell_bench_press"
+    ]
+}
+```
+
 ---
 
 ## Workout Template
+
+Represents the planned workout for a particular training day.
 
 ```text
 id
 day
 name
 exercises[]
-cardio
 ```
+
+Example:
+
+```text
+id: "push_a"
+day: "Monday"
+name: "Push A"
+exercises:
+    [
+        machine_chest_press,
+        incline_dumbbell_press,
+        machine_shoulder_press,
+        lateral_raise,
+        cable_triceps_pushdown
+    ]
+```
+
+A workout template does not represent a completed workout.
 
 ---
 
 ## Workout Session
+
+Represents an actual workout performed by the user.
 
 ```text
 id
@@ -713,18 +977,20 @@ workoutTemplateId
 startTime
 endTime
 duration
-
+status
 warmup
 exercises[]
 cardio
 notes
-
-status
 ```
+
+The session stores what actually happened during the workout.
 
 ---
 
 ## Exercise Performance
+
+Represents the user's actual performance for one exercise during a workout session.
 
 ```text
 programmedExerciseId
@@ -740,9 +1006,25 @@ sets[]
 notes
 ```
 
+The application must preserve the distinction between:
+
+```text
+Programmed Exercise
+```
+
+and:
+
+```text
+Performed Exercise
+```
+
+This allows exercise substitutions without losing the original workout plan.
+
 ---
 
 ## Set
+
+Represents one performed set.
 
 ```text
 setNumber
@@ -750,9 +1032,31 @@ weight
 reps
 ```
 
+A set does not contain another `sets` field.
+
+Each set has independent weight and rep values.
+
+Example:
+
+```javascript
+{
+    setNumber: 1,
+    weight: 30,
+    reps: 10
+}
+```
+
+```javascript
+{
+    setNumber: 2,
+    weight: 30,
+    reps: 9
+}
+```
+
 ---
 
-# 25. Data Integrity Requirements
+# 13. Data Integrity Requirements
 
 The application must avoid accidentally losing workout data.
 
@@ -764,58 +1068,7 @@ If LocalStorage is unavailable or corrupted, the application should display a cl
 
 ---
 
-# 26. UI Requirements
-
-## General
-
-The interface should be:
-
-* Clean
-* Simple
-* Mobile-friendly/Laptop-Friendly
-* Easy to use inside a gym
-* Touch-friendly
-* Fast to navigate
-
-The user should not need to navigate through many screens to record one set.
-
----
-
-# 27. Mobile-First Requirement
-
-The application should be designed primarily for a smartphone.
-
-Important controls should be easy to tap.
-
-Input fields should be large enough for quick gym use.
-
-The resistance-training screen should prioritize:
-
-```text
-Exercise
-Target
-Previous
-Set logging
-Complete
-```
-
-over decorative elements.
-
----
-
-# 28. Responsive Design
-
-The application must work reasonably on:
-
-* Mobile
-* Tablet
-* Desktop
-
-Desktop may use additional horizontal space, but the core functionality must remain identical.
-
----
-
-# 29. Navigation
+# 14. Navigation
 
 V1 should have a simple navigation structure.
 
@@ -835,7 +1088,14 @@ Today's workout and quick status.
 
 Active workout logging.
 
-### History
+### Data Export / Import
+
+* [ ] User can export workout data.
+* [ ] User can import previously exported data.
+* [ ] Invalid imported data is rejected safely.
+* [ ] Destructive replacement requires confirmation.
+
+## History
 
 Previously saved workouts.
 
@@ -843,7 +1103,7 @@ No complicated navigation is required in V1.
 
 ---
 
-# 30. Workout State
+# 15. Workout State
 
 An active workout should have a state.
 
@@ -869,7 +1129,7 @@ If the user accidentally refreshes the page during an active workout, the applic
 
 ---
 
-# 31. Validation
+# 16. Validation
 
 The application should validate user inputs.
 
@@ -891,10 +1151,7 @@ Must be:
 
 ### Duration
 
-Must be:
-
-* numeric
-* zero or greater
+When provided, must be numeric and zero or greater.
 
 Invalid input should produce a clear message.
 
@@ -906,7 +1163,7 @@ Please enter a valid number of reps.
 
 ---
 
-# 32. Empty States
+# 17. Empty States
 
 The application should handle missing data gracefully.
 
@@ -929,7 +1186,7 @@ No previous performance recorded.
 
 ---
 
-# 33. Error Handling
+# 18. Error Handling
 
 The application should not fail silently.
 
@@ -947,7 +1204,7 @@ Technical error details may be logged to the browser console for debugging.
 
 ---
 
-# 34. V1 Analytics
+# 19. V1 Analytics
 
 V1 should **not** contain advanced analytics.
 
@@ -961,87 +1218,7 @@ Advanced progression analytics are outside V1.
 
 ---
 
-# 35. V1 Does NOT Include
-
-The following features are explicitly excluded from V1:
-
-### Authentication
-
-No:
-
-* Login
-* Signup
-* Passwords
-* Accounts
-
-### Backend
-
-No:
-
-* Flask
-* FastAPI
-* Node backend
-* REST API
-
-### Database
-
-No:
-
-* PostgreSQL
-* MySQL
-* MongoDB
-
-### Cloud Sync
-
-No cloud synchronization.
-
-### Social Features
-
-No:
-
-* Friends
-* Followers
-* Leaderboards
-* Sharing
-
-### Nutrition Tracking
-
-No:
-
-* Calories
-* Protein
-* Meal tracking
-* Supplements
-
-### Body Measurements
-
-No:
-
-* Weight tracking
-* Waist tracking
-* Body-fat tracking
-* Progress photos
-
-### Advanced Analytics
-
-No:
-
-* Volume analytics
-* Muscle-volume analysis
-* Progress graphs
-* Plateau detection
-* 1RM calculations
-* Advanced progression algorithms
-
-### AI Features
-
-No AI-generated coaching or workout recommendations in V1.
-
-AI may be considered in a later version.
-
----
-
-# 36. Technical Architecture
+# 20. Technical Architecture
 
 V1 should use a simple client-side architecture.
 
@@ -1081,7 +1258,7 @@ The exact structure can change during implementation if a simpler architecture i
 
 ---
 
-# 37. Source of Truth
+# 21. Source of Truth
 
 The application's workout program should exist as structured data rather than being duplicated manually throughout HTML.
 
@@ -1101,17 +1278,17 @@ The UI should render the data dynamically.
 
 ---
 
-# 38. Persistence Strategy
+# 22. Persistence Strategy
 
-LocalStorage should be used for:
+LocalStorage should be used for user-generated and mutable runtime data:
 
 ```text
-workout templates
-exercise data
 active workout
 completed workout history
 application settings
 ```
+
+Workout templates and exercise definitions should normally remain in the application's structured source data. They do not need to be duplicated in LocalStorage unless the implementation later supports user customization.
 
 A reasonable storage structure could be:
 
@@ -1121,11 +1298,13 @@ gymTracker.activeWorkout
 gymTracker.settings
 ```
 
+If export/import is implemented as a full application backup, the exported file may contain all of the above data.
+
 Exact key names are implementation details.
 
 ---
 
-# 39. Security / Privacy
+# 23. Security / Privacy
 
 V1 stores data locally in the user's browser.
 
@@ -1140,7 +1319,7 @@ The application should not request:
 
 ---
 
-# 40. Accessibility
+# 24. Accessibility
 
 The application should provide:
 
@@ -1155,7 +1334,7 @@ Icons should not be the only indication of an action.
 
 ---
 
-# 41. Performance
+# 25. Performance
 
 V1 should load quickly.
 
@@ -1171,7 +1350,7 @@ Avoid unnecessary libraries unless they provide clear value.
 
 ---
 
-# 42. Acceptance Criteria
+# 26. Acceptance Criteria
 
 V1 is considered complete when all of the following are true:
 
@@ -1212,12 +1391,25 @@ V1 is considered complete when all of the following are true:
 * [ ] Distance can optionally be recorded.
 * [ ] Cardio notes can optionally be recorded.
 
+## Timer
+
+* [ ] Workout timer starts for an active workout.
+* [ ] Elapsed duration is displayed.
+* [ ] Duration is stored with the saved workout.
+
 ## Saving
 
 * [ ] Workout can be saved.
 * [ ] Saved data survives page refresh.
 * [ ] Saved data survives browser restart.
 * [ ] Active workout can be restored after refresh.
+
+## Data Export / Import
+
+* [ ] User can export workout data.
+* [ ] User can import previously exported data.
+* [ ] Invalid imported data is rejected safely.
+* [ ] Destructive replacement requires confirmation.
 
 ## History
 
@@ -1232,17 +1424,18 @@ V1 is considered complete when all of the following are true:
 
 ## Quality
 
-* [ ] Application works on mobile.
 * [ ] Application works on desktop.
+* [ ] Application works on laptop.
+* [ ] Application remains usable at reduced browser widths.
 * [ ] Invalid inputs are handled.
 * [ ] No critical JavaScript errors remain in the console.
 * [ ] No workout data is silently lost.
 
 ---
 
-# 43. Definition of Done
+# 27. Definition of Done
 
-V1 is **Done** when a user can realistically walk into a gym with their phone and perform this complete flow:
+V1 is **Done** when a user can realistically use the tracker during a real gym session and perform this complete flow on the supported desktop/laptop interface:
 
 ```text
 Open Tracker
@@ -1280,7 +1473,7 @@ If this workflow works reliably, **V1 has achieved its purpose.**
 
 ---
 
-# 44. Future Roadmap
+# 28. Future Roadmap
 
 These features are intentionally reserved for future versions.
 
@@ -1330,7 +1523,7 @@ Potential features:
 
 ---
 
-# 45. Product Principle
+# 29. Product Principle
 
 The most important principle for V1 is:
 
@@ -1345,11 +1538,11 @@ Every feature should justify its existence by improving one of these:
 3. **Consistency**
 4. **Progress visibility**
 
-If a feature does not significantly improve one of those areas, it should probably wait for a later version.
+If a feature does not significantly improve one of those areas, it should wait for a later version.
 
 ---
 
-# 46. V1 Success Criteria
+# 30. V1 Success Criteria
 
 The project succeeds if the user can consistently use it during real gym sessions without friction.
 
