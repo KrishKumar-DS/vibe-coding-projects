@@ -1,13 +1,11 @@
-# Gym Progression Tracker — V1
+# Gym Progression Tracker — Product Requirements Document
 
-**Version:** 1.0
-**Status:** Planning
-**Platform:** Web
-**Primary User:** Single personal user
-**Frontend:** HTML + CSS + JavaScript
-**Storage:** Browser LocalStorage
-**Backend:** None
-**Database:** None
+**Project Type:** Personal Web Application
+**Project Stage:** MVP / Functional Prototype
+**Technology:** HTML, CSS, JavaScript
+**Architecture:** Single-file client-side application
+**Data Storage:** Browser `localStorage`
+**Target Platform:** Desktop-first personal use, with responsive layout support
 
 ---
 
@@ -17,1539 +15,911 @@
 
 **Gym Progression Tracker**
 
-A personal web application for planning, logging, and reviewing gym workouts.
+## 1.2 Product Purpose
 
-The application converts a predefined 6-day training routine into an interactive workout-tracking system where the user can:
+Gym Progression Tracker is a personal workout tracking web application designed to make it easy to:
 
-* See the correct workout for the current day.
-* Complete a warm-up.
-* Log resistance-training exercises.
-* Record sets, reps, and weight.
-* Replace an exercise with an approved alternative when necessary.
-* Record cardio.
-* Add workout notes.
-* Save the completed workout.
-* Review previous workout sessions.
+* Follow a predefined workout routine.
+* Record exercises, sets, weight, and repetitions.
+* Review previous workouts.
+* Edit or delete workout records.
+* Monitor exercise progression over time.
+* Customize the workout routine.
+* Preserve workout data locally in the browser.
+* Create and restore manual backups.
+
+The primary objective is to replace manual workout tracking with a simple, structured digital system.
 
 ---
 
 # 2. Problem Statement
 
-When training consistently, manually remembering:
+Traditional workout tracking can become difficult when workout information is stored across notebooks, phone notes, spreadsheets, or memory.
 
-* which exercises were performed,
-* how much weight was used,
-* how many reps were completed,
-* what happened during the previous session,
-* which exercise alternatives can be used,
+The application solves this by providing a centralized system where workout data can be recorded in a consistent structure.
 
-becomes inconvenient and makes progression harder to track.
+The system should answer questions such as:
 
-The application should provide a simple system for answering:
-
-> **"What am I supposed to do today, what did I actually do, and what happened during the workout?"**
-
-V1 focuses on **accurate workout logging**, not advanced fitness coaching.
+* What workout am I performing today?
+* What weight did I use previously?
+* How many repetitions did I perform?
+* What exercises are included in my routine?
+* How has my performance changed over time?
+* How much training volume did I perform?
+* Can I review or correct a previous workout?
 
 ---
 
-# 3. Product Goal
+# 3. Goals
 
-The primary goal of V1 is:
+## 3.1 Primary Goals
 
-> **Create a reliable personal workout logging system that makes recording each gym session fast and structured.**
+1. Make workout logging fast and simple.
+2. Maintain a structured workout history.
+3. Make previous performance visible while logging a new workout.
+4. Allow the user to customize their workout routine.
+5. Provide basic progression analytics.
+6. Store data without requiring a backend or account.
+7. Allow manual backup and restoration of workout data.
 
-The application should reduce the amount of information the user has to remember manually.
+## 3.2 Secondary Goals
 
----
-
-# 4. Target Platform
-
-V1 is designed primarily for **desktop and laptop use**.
-
-### Platform Priority
-
-1. Desktop — Primary
-2. Laptop — Primary
-3. Tablet — Secondary
-4. Mobile — Not a V1 requirement
-
-The application should make effective use of larger desktop screens while remaining structurally responsive enough that the interface does not break on smaller screens.
-
-V1 does not require mobile-first optimization.
+1. Minimize unnecessary UI complexity.
+2. Keep the application lightweight.
+3. Make the application usable without an internet connection after loading.
+4. Keep the initial architecture simple enough to understand and maintain.
 
 ---
 
-# 5. UI Requirements
+# 4. Non-Goals
 
-The interface should be:
+The current version does NOT attempt to provide:
 
-* Clean
-* Simple
-* Fast
-* Easy to understand
-* Keyboard-friendly where practical
-* Comfortable for extended desktop use
-* Visually organized
-* Focused on workout logging rather than decoration
+* User accounts.
+* Authentication.
+* Cloud synchronization.
+* A backend server.
+* A remote database.
+* Social features.
+* Trainer/coaching functionality.
+* Nutrition tracking.
+* Body-weight tracking.
+* Sleep tracking.
+* Wearable/device integration.
+* AI-generated workout plans.
+* Automatic cloud backups.
+* Multi-user support.
 
-The application should minimize unnecessary navigation and interactions.
-
-The user should be able to record a workout without repeatedly switching between screens.
+These may be considered future features but are outside the current MVP.
 
 ---
 
-# 6. Desktop Layout
+# 5. Target User
 
-The primary application layout may use:
+## Primary User
+
+A single individual who regularly performs resistance training and wants to track workout performance and progression.
+
+The current application is designed primarily for personal use rather than as a commercial multi-user fitness platform.
+
+---
+
+# 6. Core User Stories
+
+## Workout Logging
+
+* As a user, I want to see my workout routine for a selected day.
+* As a user, I want to enter the weight used for each set.
+* As a user, I want to enter repetitions for each set.
+* As a user, I want to mark sets as completed.
+* As a user, I want to skip an exercise when necessary.
+* As a user, I want to add an additional exercise to a workout.
+* As a user, I want to add or remove individual sets.
+* As a user, I want to copy a weight across all sets of an exercise.
+
+## Previous Performance
+
+* As a user, I want to see my previous sets for an exercise while logging.
+* As a user, I want the application to pre-fill the previous weight when possible.
+
+The current implementation retrieves previous sets for the same exercise and uses them when constructing a new workout draft.
+
+## Workout History
+
+* As a user, I want to see previously completed workouts.
+* As a user, I want workouts grouped by year.
+* As a user, I want to see the exercises and sets recorded in a workout.
+* As a user, I want to edit an existing workout.
+* As a user, I want to delete an existing workout.
+* As a user, I want to log workouts for previous dates.
+
+## Progression
+
+* As a user, I want to select an exercise.
+* As a user, I want to see my best recorded weight.
+* As a user, I want to see an estimated 1RM.
+* As a user, I want to see the number of sessions containing the exercise.
+* As a user, I want to visualize weight progression over time.
+
+## Routine Management
+
+* As a user, I want to define a routine for each day.
+* As a user, I want to rename a workout day.
+* As a user, I want to add exercises to a routine.
+* As a user, I want to remove exercises.
+* As a user, I want to define set ranges.
+* As a user, I want to define repetition ranges.
+* As a user, I want to define the target muscle group.
+
+## Data Management
+
+* As a user, I want workout data to persist after refreshing the page.
+* As a user, I want to manually create a backup.
+* As a user, I want to restore data from a backup.
+
+---
+
+# 7. Functional Requirements
+
+## FR-01 — Workout Day Selection
+
+The application shall allow the user to select a workout day from Monday through Sunday.
+
+The selected day shall determine which routine is displayed.
+
+---
+
+## FR-02 — Date Selection
+
+The application shall allow the user to select a workout date.
+
+The user shall be able to log workouts for previous dates.
+
+Future dates shall not be selectable from the current workout interface.
+
+The application derives the weekday from the selected date.
+
+---
+
+## FR-03 — Exercise Display
+
+For each exercise in the selected routine, the application shall display:
+
+* Exercise name.
+* Target muscle group.
+* Target set range.
+* Target repetition range.
+* Previous recorded sets when available.
+
+---
+
+## FR-04 — Set Management
+
+The user shall be able to:
+
+* Enter weight.
+* Enter repetitions.
+* Mark a set as completed.
+* Add a set.
+* Delete a set.
+* Copy the first set's weight to all sets.
+
+---
+
+## FR-05 — Exercise Management During Workout
+
+The user shall be able to:
+
+* Skip an exercise.
+* Re-enable a skipped exercise.
+* Remove an exercise from the current workout.
+* Add an additional exercise.
+
+Additional exercises may be assigned a muscle group and are treated as custom workout entries.
+
+---
+
+## FR-06 — Workout Completion
+
+When the user finishes a workout:
+
+1. Exercises marked as skipped shall be excluded.
+2. Sets without recorded repetitions shall not be saved.
+3. Recorded weight and repetitions shall be converted into numeric values.
+4. At least one exercise with recorded repetitions shall be required.
+5. The workout shall be stored in the workout history.
+
+The application currently uses repetitions as the minimum condition for saving a set.
+
+---
+
+## FR-07 — Workout Editing
+
+The user shall be able to open an existing workout and modify its recorded data.
+
+Editing an existing workout shall update the original record rather than create an additional duplicate record.
+
+---
+
+## FR-08 — Workout Deletion
+
+The user shall be able to delete a previously saved workout.
+
+The application shall request confirmation before deletion.
+
+---
+
+## FR-09 — Workout History
+
+The History module shall display:
+
+* Workout date.
+* Workout name.
+* Number of exercises.
+* Total training volume.
+
+The current volume calculation is:
+
+**Training Volume = Σ (Weight × Repetitions)**
+
+for all recorded sets in the workout.
+
+---
+
+## FR-10 — Progression Tracking
+
+The Progression module shall allow the user to select an exercise and view:
+
+* Best recorded weight.
+* Estimated 1RM.
+* Number of sessions.
+* Historical top-set weight.
+* A progression graph.
+
+---
+
+## FR-11 — Estimated 1RM
+
+The application shall estimate 1RM using the following formula:
+
+**Estimated 1RM = Weight × (1 + Reps / 30)**
+
+The application calculates the highest estimated value across the exercise's recorded sets.
+
+This value is an estimate and shall not be treated as an actual tested one-repetition maximum.
+
+---
+
+## FR-12 — Routine Management
+
+The Routine module shall allow the user to configure each day independently.
+
+Each routine exercise shall support:
+
+* Exercise name.
+* Muscle group.
+* Minimum sets.
+* Maximum sets.
+* Minimum repetitions.
+* Maximum repetitions.
+
+The application shall allow exercises to be added and removed from a routine.
+
+---
+
+## FR-13 — Local Persistence
+
+The application shall persist application data using browser `localStorage`.
+
+Two categories of data are currently stored:
+
+* Main application data.
+* Current workout draft.
+
+The application shall restore saved data when reopened in the same browser environment.
+
+---
+
+## FR-14 — Workout Draft Persistence
+
+While a workout is being entered, the current draft shall be stored separately from completed workout history.
+
+This prevents a partially completed workout from being treated as a completed workout.
+
+---
+
+## FR-15 — Backup
+
+The user shall be able to create a manual backup of the application state.
+
+## The current implementation serializes the application state as JSON and copies it to the clipboard when possible.
+
+## FR-16 — Restore
+
+The user shall be able to paste a previously created JSON backup.
+
+The application shall validate that the restored object contains the required `plan` and `logs` structures before replacing the current application state.
+
+---
+
+# 8. Application Structure
+
+The current application contains four primary views.
+
+## 8.1 Today
+
+Purpose:
+
+**Perform and record the current workout.**
+
+Responsibilities:
+
+* Select date/day.
+* Display routine.
+* Enter sets.
+* Enter weight/reps.
+* Skip exercises.
+* Add exercises.
+* Save workout.
+
+---
+
+## 8.2 History
+
+Purpose:
+
+**Review previously recorded workouts.**
+
+Responsibilities:
+
+* Display saved workouts.
+* Group workouts by year.
+* Calculate workout volume.
+* Expand workout details.
+* Edit workouts.
+* Delete workouts.
+* Start logging a past workout.
+
+---
+
+## 8.3 Progression
+
+Purpose:
+
+**Analyze performance for individual exercises.**
+
+Responsibilities:
+
+* Select exercise.
+* Display best weight.
+* Display estimated 1RM.
+* Display session count.
+* Display progression graph.
+* Display historical top-set records.
+
+---
+
+## 8.4 Routine
+
+Purpose:
+
+**Configure the workout structure.**
+
+Responsibilities:
+
+* Select workout day.
+* Rename routine.
+* Add exercises.
+* Remove exercises.
+* Configure sets.
+* Configure reps.
+* Configure muscle groups.
+* Backup data.
+* Restore data.
+
+---
+
+# 9. Data Model
+
+## 9.1 Application State
+
+The application maintains a central state containing:
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Gym Progression Tracker                    Date / Day        │
-├──────────────┬───────────────────────────────────────────────┤
-│              │                                               │
-│ Dashboard    │              Main Content                     │
-│ Workout      │                                               │
-│ History      │                                               │
-│              │                                               │
-└──────────────┴───────────────────────────────────────────────┘
+S
+├── plan
+│   ├── Monday
+│   ├── Tuesday
+│   ├── Wednesday
+│   ├── Thursday
+│   ├── Friday
+│   ├── Saturday
+│   └── Sunday
+│
+└── logs
+    └── workout records
 ```
 
-The exact visual design is an implementation decision.
-
-The application should prioritize:
-
-1. Workout information
-2. Previous performance
-3. Set logging
-4. Workout status
-5. Navigation
-
-over decorative UI elements.
+The current implementation initializes this state through a default configuration and loads existing state from `localStorage`.
 
 ---
 
-# 7. Responsive Design
+## 9.2 Routine Exercise
 
-Responsive behavior is desirable but secondary to the desktop experience.
-
-The application must not become unusable when the browser window is reduced in width.
-
-Mobile-specific optimization is outside the scope of V1. The UI should not be designed around mobile-first interaction.
-
----
-
-# 8. V1 Scope
-
-V1 is a personal workout logging application.
-
-The primary responsibility of V1 is:
-
-> **Tell the user what workout they planned, allow them to record what they actually performed, and preserve that information for future reference.**
-
-V1 prioritizes:
-
-1. Logging
-2. Recall
-3. Consistency
-4. Basic progress visibility
-
----
-
-## V1 Includes
-
-* Six-day workout schedule
-* Sunday rest-day state
-* Automatic current-day detection
-* Manual workout-day selection
-* Workout templates
-* Workout sessions
-* Warm-up tracking
-* Exercise logging
-* Set logging
-* Weight and rep tracking
-* Exercise alternatives
-* Previous workout performance
-* Cardio logging
-* Workout notes
-* Workout timer
-* Workout summary
-* Workout history
-* Previous workout detail
-* LocalStorage persistence
-* Active workout restoration
-* Input validation
-* Basic error handling
-* Data export/import
-
----
-
-## V1 Does Not Include
-
-### Accounts
-
-* Login
-* Signup
-* User accounts
-
-### Backend
-
-* Flask
-* FastAPI
-* Node.js backend
-* REST API
-
-### Database
-
-* PostgreSQL
-* MySQL
-* MongoDB
-
-### Cloud
-
-* Cloud synchronization
-* Multi-device synchronization
-
-### Social
-
-* Friends
-* Followers
-* Leaderboards
-* Social sharing
-
-### Nutrition
-
-* Calories
-* Protein
-* Meal tracking
-* Supplement tracking
-
-### Body Tracking
-
-* Body weight
-* Waist measurements
-* Body-fat percentage
-* Progress photos
-
-### Advanced Analytics
-
-* Advanced progression algorithms
-* Plateau detection
-* Advanced muscle-volume analysis
-* Advanced 1RM analysis
-
-### AI
-
-* AI coaching
-* AI-generated workout recommendations
-* AI-generated training plans
-
-These features may be considered in later versions.
-
----
-
-# 9. Training Schedule
-
-The application uses the following weekly structure.
-
-## Monday — Push A
-
-| Exercise               | Sets × Reps |
-| ---------------------- | ----------- |
-| Machine Chest Press    | 2 × 8–12    |
-| Incline Dumbbell Press | 2 × 8–12    |
-| Machine Shoulder Press | 2 × 8–12    |
-| Lateral Raise          | 2 × 12–15   |
-| Cable Triceps Pushdown | 2 × 10–15   |
-
----
-
-## Tuesday — Pull A
-
-| Exercise            | Sets × Reps |
-| ------------------- | ----------- |
-| Lat Pulldown        | 2 × 8–12    |
-| Seated Cable Row    | 2 × 8–12    |
-| Chest-Supported Row | 2 × 8–12    |
-| Reverse Pec Deck    | 2 × 12–15   |
-| Dumbbell Curl       | 2 × 10–15   |
-
----
-
-## Wednesday — Legs A
-
-| Exercise             | Sets × Reps |
-| -------------------- | ----------- |
-| Leg Press            | 2 × 8–12    |
-| Leg Curl             | 2 × 10–15   |
-| Leg Extension        | 2 × 10–15   |
-| Calf Raise           | 2 × 12–15   |
-| Cable/Machine Crunch | 2 × 10–15   |
-
----
-
-## Thursday — Push B
-
-| Exercise                   | Sets × Reps |
-| -------------------------- | ----------- |
-| Incline Machine Press      | 2 × 8–12    |
-| Machine Chest Press        | 2 × 8–12    |
-| Lateral Raise              | 2 × 12–15   |
-| Shoulder Press             | 2 × 8–12    |
-| Overhead Triceps Extension | 2 × 10–15   |
-
----
-
-## Friday — Pull B
-
-| Exercise                      | Sets × Reps |
-| ----------------------------- | ----------- |
-| Lat Pulldown                  | 2 × 8–12    |
-| Seated Cable Row              | 2 × 8–12    |
-| Single-Arm Cable/Dumbbell Row | 2 × 8–12    |
-| Reverse Pec Deck              | 2 × 12–15   |
-| Hammer Curl                   | 2 × 10–15   |
-
----
-
-## Saturday — Legs B
-
-| Exercise                           | Sets × Reps |
-| ---------------------------------- | ----------- |
-| Goblet/Weighted Squat              | 2 × 8–12    |
-| Romanian Deadlift                  | 2 × 8–12    |
-| Leg Press                          | 2 × 10–12   |
-| Calf Raise                         | 2 × 12–15   |
-| Hanging/Captain's Chair Knee Raise | 2 × 8–15    |
-
----
-
-## Sunday — Rest
-
-Sunday is a:
-
-**Full Rest + Walking Day**
-
-No resistance-training workout is scheduled. Optional walking may be recorded as cardio if the user chooses.
-
----
-
-# 10. V1 Core User Flow
-
-The main user flow should be:
+A routine exercise contains:
 
 ```text
-Open Application
-       ↓
-Determine Current Date
-       ↓
-Determine Day of Week
-       ↓
-Load Today's Workout
-       ↓
-Warm-up
-       ↓
-Resistance Training
-       ↓
-Cardio
-       ↓
-Review Workout
-       ↓
-Save Workout
-       ↓
-Workout History
-```
-
----
-
-# 11. Functional Requirements
-
-## FR-01 — Current Date and Day
-
-The application must automatically display:
-
-* Current date
-* Current day of the week
-
-Example:
-
-```text
-Saturday
-03 October 2026
-```
-
-The application should use the user's local browser date/time.
-
-The user should not need to manually enter the date for a normal workout.
-
----
-
-## FR-02 — Today's Workout
-
-The application must automatically load the workout associated with the current day.
-
-Example:
-
-```text
-Saturday
-
-LEGS B
-
-5 Exercises
-10 Target Sets
-```
-
-The application must display:
-
-* Workout name
-* Exercise list
-* Target sets
-* Target rep range
-
----
-
-## FR-03 — Manual Day Selection
-
-The user must also be able to select another day manually.
-
-Example:
-
-```text
-< Previous     Saturday     Next >
-```
-
-or:
-
-```text
-Monday
-Tuesday
-Wednesday
-Thursday
-Friday
-Saturday
-Sunday
-```
-
-This allows the user to:
-
-* review another workout,
-* log a missed workout,
-* test the application,
-* inspect the routine.
-
-Changing the displayed day must **not automatically create a workout record**.
-
----
-
-## FR-04 — Warm-Up
-
-Each workout day must contain a warm-up section.
-
-V1 warm-up should be simple.
-
-Example:
-
-```text
-WARM-UP
-
-☐ Light cardio
-☐ Dynamic mobility
-☐ Workout-specific preparation
-
-Duration: [ 5 ] minutes
-```
-
-The user must be able to mark warm-up items as completed.
-
-The user must be able to enter warm-up duration.
-
-Warm-up completion is stored as part of the workout session.
-
----
-
-## FR-05 — Resistance Training
-
-The application must display every exercise assigned to the selected workout.
-
-Each exercise must show:
-
-* Exercise name
-* Target sets
-* Target rep range
-* Previous performance, if available
-* Current set logging fields
-* Alternative-exercise option
-* Notes option
-
-Example:
-
-```text
-Machine Chest Press
-
-Target:
-2 × 8–12
-
-Previous:
-30 kg × 10
-30 kg × 9
-
-SET 1
-Weight: [ 30 ] kg
-Reps:   [ 10 ]
-
-SET 2
-Weight: [ 30 ] kg
-Reps:   [ 9 ]
-
-[ Change Exercise ]
-
-Notes:
-[________________]
-```
-
----
-
-## FR-06 — Set Logging
-
-Every programmed set must have independent input fields for:
-
-* Weight
-* Reps
-* Set number (managed by the interface)
-
-Example:
-
-```text
-Set 1
-Weight: 30 kg
-Reps: 10
-
-Set 2
-Weight: 30 kg
-Reps: 9
-```
-
-The application must **not** assume that every set uses the same weight or reps.
-
-The user must be able to record different values for each set.
-
----
-
-## FR-07 — Exercise Replacement
-
-The user must be able to replace a programmed exercise with an alternative.
-
-Example:
-
-```text
-Programmed Exercise:
-Machine Shoulder Press
-
-Alternative Exercises:
-
-○ Dumbbell Shoulder Press
-○ Smith Machine Shoulder Press
-○ Cable Shoulder Press
-```
-
-After replacement:
-
-```text
-Programmed:
-Machine Shoulder Press
-
-Performed:
-Dumbbell Shoulder Press
-```
-
-The application must preserve the distinction between:
-
-**Programmed Exercise**
-
-and
-
-**Performed Exercise**
-
-This is important for maintaining accurate workout history.
-
----
-
-## FR-08 — Exercise Alternatives
-
-V1 must contain predefined alternatives for exercises where alternatives are useful.
-
-Example:
-
-### Machine Shoulder Press
-
-Alternatives:
-
-* Dumbbell Shoulder Press
-* Smith Machine Shoulder Press
-* Cable Shoulder Press
-
-### Machine Chest Press
-
-Alternatives:
-
-* Dumbbell Bench Press
-* Barbell Bench Press
-* Push-up
-
-### Lat Pulldown
-
-Alternatives:
-
-* Assisted Pull-up
-* Band Lat Pulldown
-* Cable Pulldown variation
-
-The alternatives should come from the application's exercise data rather than being manually typed each time.
-
----
-
-## FR-09 — Exercise Replacement Rules
-
-Replacing an exercise must:
-
-1. Preserve the original programmed exercise.
-2. Record the selected alternative.
-3. Preserve the target set/rep structure unless manually changed.
-4. Allow the user to log the alternative normally.
-5. Show the performed exercise in the saved workout history.
-
-Example:
-
-```text
-Programmed:
-Machine Shoulder Press
-
-Performed:
-Dumbbell Shoulder Press
-
-Target:
-2 × 8–12
-
-Actual:
-7.5 kg × 10
-7.5 kg × 8
-```
-
----
-
-## FR-10 — Cardio
-
-Each workout should provide a cardio section. Cardio logging is optional for a workout session.
-
-The user must be able to record:
-
-* Cardio type
-* Duration
-* Optional distance
-* Optional notes
-
-Example:
-
-```text
-CARDIO
-
-Type:
-[ Treadmill ▼ ]
-
-Duration:
-[ 15 ] minutes
-
-Distance:
-[ 1.2 ] km
-
-Notes:
-[ Moderate pace ]
-```
-
-Not every field needs to be mandatory.
-
----
-
-## FR-11 — Workout Notes
-
-The user must be able to add general workout notes.
-
-Example:
-
-```text
-WORKOUT NOTES
-
-[ Felt strong today.
-  Shoulder press machine was occupied.
-  Energy was good. ]
-```
-
-These notes must be stored with the workout session.
-
----
-
-## FR-12 — Workout Completion
-
-The application must provide a clear way to finish a workout.
-
-Example:
-
-```text
-Exercises Completed:
-5 / 5
-
-Sets Completed:
-10 / 10
-
-Warm-up:
-✓
-
-Cardio:
-✓
-
-[ Finish Workout ]
-```
-
-Before saving, the application should provide a summary.
-
----
-
-## FR-13 — Workout Timer
-
-The application should provide a workout timer for the active session.
-
-The timer must:
-
-* Start when the user starts the workout.
-* Continue while the workout is in progress.
-* Display elapsed time.
-* Stop when the workout is completed.
-* Preserve the session duration when the workout is saved.
-* Restore the timer state when an active workout is restored after refresh, where technically reliable.
-
-The timer is for tracking session duration only. It is not a rest timer or exercise-specific interval timer in V1.
-
----
-
-## FR-14 — Workout Summary
-
-Before final save:
-
-```text
-WORKOUT SUMMARY
-
-Saturday — Legs B
-
-Exercises       5
-Completed Sets  10
-Warm-up         ✓
-Cardio          ✓
-
-Duration        48 min
-
-[ Save Workout ]
-[ Continue Editing ]
-```
-
-The user must be able to return to editing before saving.
-
----
-
-## FR-15 — Workout History
-
-The application must provide a history page.
-
-Each saved workout should show:
-
-* Date
-* Day
-* Workout name
-* Completion status
-* Duration
-
-Example:
-
-```text
-WORKOUT HISTORY
-
-03 Oct 2026
-Saturday — Legs B
-Completed
-
-02 Oct 2026
-Friday — Pull B
-Completed
-
-01 Oct 2026
-Thursday — Push B
-Completed
-```
-
----
-
-## FR-16 — View Previous Workout
-
-The user must be able to open a saved workout.
-
-The detail view should display:
-
-* Workout date
-* Workout name
-* Warm-up
-* Exercises
-* Programmed exercises
-* Performed exercises
-* Sets
-* Reps
-* Weight
-* Cardio
-* Notes
-
----
-
-## FR-17 — Previous Performance
-
-When performing an exercise that has historical data, the application should display the most recent performance.
-
-Example:
-
-```text
-Machine Chest Press
-
-LAST SESSION
-
-30 kg × 10
-30 kg × 9
-```
-
-If no previous record exists:
-
-```text
-No previous data
-```
-
-This feature is informational only.
-
-V1 does not automatically prescribe the next weight.
-
----
-
-## FR-18 — Data Persistence
-
-## FR-19 — Data Export and Import
-
-The user must be able to export workout data to a portable file and import a previously exported file.
-
-V1 export/import must:
-
-1. Export completed workout history and relevant application data.
-2. Produce a format that can be stored outside the browser.
-3. Validate imported data before replacing or merging local data.
-4. Require deliberate user confirmation before destructive replacement.
-5. Preserve historical workout records after a successful import.
-
-Example controls:
-
-```text
-[ Export Data ]
-[ Import Data ]
-```
-
-Import/export is a backup and portability mechanism, not cloud synchronization.
-
----
-
-
-
-Workout data must survive:
-
-* Page refresh
-* Browser restart
-* Closing the tab
-
-V1 will use:
-
-**Browser LocalStorage**
-
-No server/database is required.
-
----
-
-# 12. Data Model
-
-The application should separate static workout programming from recorded workout history.
-
-The core relationship is:
-
-```text
-Exercise Database
-       ↓
-Workout Template
-       ↓
-Workout Session
-       ↓
-Exercise Performance
-       ↓
-Set
-```
-
----
-
-## Exercise
-
-Represents an exercise known by the application.
-
-```text
-id
 name
-muscleGroup
-equipment
-category
-defaultRepRange
-alternatives[]
-```
-
-### Rules
-
-* `id` must be stable and unique.
-* Historical records should reference exercises using their ID.
-* The display name may change without breaking historical records.
-
-Example:
-
-```javascript
-{
-    id: "machine_chest_press",
-    name: "Machine Chest Press",
-    muscleGroup: "Chest",
-    equipment: "Machine",
-    category: "Compound",
-    defaultRepRange: "8-12",
-    alternatives: [
-        "dumbbell_bench_press",
-        "barbell_bench_press"
-    ]
-}
+muscle
+minimum sets
+maximum sets
+minimum reps
+maximum reps
 ```
 
 ---
 
-## Workout Template
+## 9.3 Workout Record
 
-Represents the planned workout for a particular training day.
-
-```text
-id
-day
-name
-exercises[]
-```
-
-Example:
-
-```text
-id: "push_a"
-day: "Monday"
-name: "Push A"
-exercises:
-    [
-        machine_chest_press,
-        incline_dumbbell_press,
-        machine_shoulder_press,
-        lateral_raise,
-        cable_triceps_pushdown
-    ]
-```
-
-A workout template does not represent a completed workout.
-
----
-
-## Workout Session
-
-Represents an actual workout performed by the user.
+A saved workout contains:
 
 ```text
 id
 date
 day
-workoutTemplateId
-startTime
-endTime
-duration
-status
-warmup
-exercises[]
-cardio
-notes
+year
+routine day index
+workout name
+exercises
 ```
 
-The session stores what actually happened during the workout.
-
----
-
-## Exercise Performance
-
-Represents the user's actual performance for one exercise during a workout session.
+Each exercise contains:
 
 ```text
-programmedExerciseId
-programmedExerciseName
-
-performedExerciseId
-performedExerciseName
-
-targetSets
-targetRepRange
-
-sets[]
-notes
+name
+muscle
+sets
 ```
 
-The application must preserve the distinction between:
+Each set contains:
 
 ```text
-Programmed Exercise
-```
-
-and:
-
-```text
-Performed Exercise
-```
-
-This allows exercise substitutions without losing the original workout plan.
-
----
-
-## Set
-
-Represents one performed set.
-
-```text
-setNumber
 weight
-reps
-```
-
-A set does not contain another `sets` field.
-
-Each set has independent weight and rep values.
-
-Example:
-
-```javascript
-{
-    setNumber: 1,
-    weight: 30,
-    reps: 10
-}
-```
-
-```javascript
-{
-    setNumber: 2,
-    weight: 30,
-    reps: 9
-}
+repetitions
 ```
 
 ---
+
+# 10. Data Storage Architecture
+
+## Current Architecture
+
+```text
+User
+  ↓
+Web Browser
+  ↓
+HTML + CSS + JavaScript
+  ↓
+Application State
+  ↓
+localStorage
+```
+
+There is currently:
+
+* No backend.
+* No API.
+* No database server.
+* No authentication.
+* No cloud storage.
+
+This makes the current application simple and inexpensive to operate, but data is tied to the browser/device unless manually backed up.
+
+---
+
+# 11. UI / UX Requirements
+
+## 11.1 Navigation
+
+The application shall provide navigation between:
+
+* Today
+* History
+* Progress
+* Routine
+
+The current implementation uses a fixed bottom navigation bar.
+
+---
+
+## 11.2 Visual Design
+
+The interface should prioritize:
+
+* Low visual complexity.
+* Clear hierarchy.
+* Fast data entry.
+* Consistent controls.
+* Readable workout information.
+* Clear distinction between active and skipped exercises.
+
+---
+
+## 11.3 Theme
+
+The application shall support light and dark visual themes through CSS variables and system dark-mode detection.
+
+The current implementation contains both system dark-mode handling and an explicit dark theme selector in the CSS structure.
+
+---
+
+# 12. Technical Requirements
+
+## 12.1 Frontend
+
+Required technologies:
+
+* HTML5
+* CSS3
+* JavaScript
+
+The current MVP combines all three into a single HTML file.
+
+---
+
+## 12.2 External Dependencies
+
+The current application should not require external JavaScript libraries or frameworks for its core functionality.
+
+---
+
+## 12.3 Browser Storage
+
+The application shall use:
+
+```javascript
+localStorage
+```
+
+for persistent application state.
+
+---
+
+## 12.4 Rendering
+
+The current application uses JavaScript functions to generate and replace the main application HTML.
+
+The major view functions are:
+
+```text
+today_v()
+hist_v()
+prog_v()
+plan_v()
+```
+
+## These are selected through the application view map and rendered into the main container.
 
 # 13. Data Integrity Requirements
 
-The application must avoid accidentally losing workout data.
+The application should:
 
-Before overwriting an existing saved session, the application should require deliberate user action.
+1. Prevent future workout dates from being logged.
+2. Prevent saving a completely empty workout.
+3. Ignore sets without repetitions when saving.
+4. Preserve existing workout IDs when editing.
+5. Confirm destructive deletion.
+6. Validate imported backup data.
+7. Escape user-provided text before inserting it into generated HTML.
 
-The application should not silently delete historical workouts.
-
-If LocalStorage is unavailable or corrupted, the application should display a clear error rather than pretending that data was saved successfully.
-
----
-
-# 14. Navigation
-
-V1 should have a simple navigation structure.
-
-Suggested:
-
-```text
-HOME
-WORKOUT
-HISTORY
-```
-
-### Home
-
-Today's workout and quick status.
-
-### Workout
-
-Active workout logging.
-
-### Data Export / Import
-
-* [ ] User can export workout data.
-* [ ] User can import previously exported data.
-* [ ] Invalid imported data is rejected safely.
-* [ ] Destructive replacement requires confirmation.
-
-## History
-
-Previously saved workouts.
-
-No complicated navigation is required in V1.
+The current implementation already includes input escaping through the `esc()` helper.
 
 ---
 
-# 15. Workout State
+# 14. Current MVP Acceptance Criteria
 
-An active workout should have a state.
-
-Possible states:
+The MVP is considered functional when the user can complete this workflow:
 
 ```text
-NOT_STARTED
-IN_PROGRESS
-COMPLETED
+Open Application
+      ↓
+Select Workout Day
+      ↓
+View Routine
+      ↓
+Enter Weight + Reps
+      ↓
+Complete Workout
+      ↓
+Save Workout
+      ↓
+View History
+      ↓
+Edit/Delete Workout
+      ↓
+Open Progression
+      ↓
+Analyze Exercise Progress
 ```
 
-Example:
+The user must also be able to:
 
 ```text
-Monday
-Push A
-
-Status:
-IN PROGRESS
+Routine
+   ↓
+Modify Exercises
+   ↓
+Save Routine
+   ↓
+Use Modified Routine
 ```
 
-If the user accidentally refreshes the page during an active workout, the application should attempt to restore the active session from LocalStorage.
-
----
-
-# 16. Validation
-
-The application should validate user inputs.
-
-Examples:
-
-### Weight
-
-Must be:
-
-* numeric
-* zero or greater
-
-### Reps
-
-Must be:
-
-* whole number
-* greater than zero
-
-### Duration
-
-When provided, must be numeric and zero or greater.
-
-Invalid input should produce a clear message.
-
-Example:
+And:
 
 ```text
-Please enter a valid number of reps.
+Routine
+   ↓
+Create Backup
+   ↓
+Restore Backup
+   ↓
+Recover Application Data
 ```
 
 ---
 
-# 17. Empty States
+# 15. Known Limitations
 
-The application should handle missing data gracefully.
+The current implementation has several intentional limitations.
 
-Example:
+### Storage
 
-### No Workout History
+Data is stored only in the browser's local storage.
 
-```text
-No workouts recorded yet.
+Clearing browser storage can remove application data unless a manual backup exists.
 
-Complete your first workout to start
-building your history.
-```
+### Backup
 
-### No Previous Exercise Data
+Backup is manual rather than automatic.
 
-```text
-No previous performance recorded.
-```
+### Multi-device Usage
+
+Data does not automatically synchronize between devices.
+
+### Analytics
+
+Progression analytics are currently basic.
+
+The application primarily focuses on:
+
+* Top-set weight.
+* Estimated 1RM.
+* Session count.
+* Workout volume.
+
+### Authentication
+
+There is no user account system.
+
+### Backend
+
+There is no server-side data layer.
+
+### Advanced Analytics
+
+The application does not currently provide:
+
+* Muscle-group volume analysis.
+* Weekly volume trends.
+* Personal-record detection.
+* Workout frequency analysis.
+* Exercise frequency analysis.
+* Fatigue analysis.
+* Recovery analysis.
+* Deload tracking.
+
+These are potential future improvements rather than current requirements.
 
 ---
 
-# 18. Error Handling
+# 16. Future Scope
 
-The application should not fail silently.
+Future development should be divided into stages rather than being added indiscriminately.
 
-Potential errors:
+## Phase 2 — Better Tracking
 
-* Invalid input
-* LocalStorage failure
-* Missing exercise
-* Missing workout template
-* Corrupted saved data
+Potential features:
 
-The user should receive a clear, understandable message.
+* Personal Record detection.
+* Weekly/monthly volume.
+* Exercise frequency.
+* Muscle-group volume.
+* Workout duration.
+* Rest timer.
+* Body-weight tracking.
+* Notes/RPE/RIR.
 
-Technical error details may be logged to the browser console for debugging.
+## Phase 3 — Better Analytics
 
----
+Potential features:
 
-# 19. V1 Analytics
+* Weekly progression dashboards.
+* Volume progression.
+* Strength trends.
+* Muscle-group balance.
+* Training consistency.
+* PR history.
+* Advanced charts.
 
-V1 should **not** contain advanced analytics.
+## Phase 4 — Architecture Improvement
 
-It may display basic information such as:
-
-* Number of completed workouts
-* Workout history
-* Previous exercise performance
-
-Advanced progression analytics are outside V1.
-
----
-
-# 20. Technical Architecture
-
-V1 should use a simple client-side architecture.
+Potential technical improvements:
 
 ```text
-HTML
-  ↓
-UI Structure
-
+Single HTML
+     ↓
+Separate HTML
+     +
 CSS
-  ↓
-Visual Design + Responsive Layout
-
+     +
 JavaScript
-  ↓
-Application Logic
-  ↓
-Workout Data
-  ↓
-LocalStorage
+     ↓
+Modular JavaScript
+     ↓
+Clear State Management
+     ↓
+Optional Backend
 ```
 
-Suggested JavaScript conceptual modules:
+The application should only move toward a backend/database architecture when the requirements justify the additional complexity.
+
+---
+
+# 17. Vibe Coding Development Workflow
+
+This project should be developed using the following engineering workflow:
 
 ```text
-/js
-│
-├── app.js
-├── workoutData.js
-├── exerciseData.js
-├── workoutManager.js
-├── storage.js
-├── ui.js
-└── utils.js
+Problem Definition
+        ↓
+System Design
+        ↓
+Specification / PRD
+        ↓
+AI Direction
+        ↓
+Implementation
+        ↓
+Testing
+        ↓
+Debugging
+        ↓
+Iteration
 ```
 
-The exact structure can change during implementation if a simpler architecture is justified.
+AI may assist with:
+
+* Generating implementation ideas.
+* Explaining unfamiliar code.
+* Identifying bugs.
+* Suggesting architecture improvements.
+* Reviewing implementation.
+* Generating test cases.
+* Refactoring code.
+
+However, generated code should not automatically be accepted.
+
+The developer should understand:
+
+* What the code does.
+* Why the code exists.
+* What data it modifies.
+* What assumptions it makes.
+* What can fail.
+* How it interacts with other parts of the application.
 
 ---
 
-# 21. Source of Truth
+# 18. Definition of Done
 
-The application's workout program should exist as structured data rather than being duplicated manually throughout HTML.
+A feature is considered complete only when:
 
-Conceptually:
+### Functionality
 
-```text
-Exercise Database
-       ↓
-Workout Templates
-       ↓
-Workout Session
-       ↓
-Saved History
-```
+* The feature works according to its specification.
 
-The UI should render the data dynamically.
+### Data
 
----
+* Data is stored correctly.
+* Existing data is not unintentionally corrupted.
 
-# 22. Persistence Strategy
+### UI
 
-LocalStorage should be used for user-generated and mutable runtime data:
+* The feature is usable.
+* States and actions are understandable.
 
-```text
-active workout
-completed workout history
-application settings
-```
+### Error Handling
 
-Workout templates and exercise definitions should normally remain in the application's structured source data. They do not need to be duplicated in LocalStorage unless the implementation later supports user customization.
+* Invalid or incomplete input is handled appropriately.
 
-A reasonable storage structure could be:
+### Testing
 
-```text
-gymTracker.workouts
-gymTracker.activeWorkout
-gymTracker.settings
-```
+The feature has been manually tested through its primary workflow and relevant edge cases.
 
-If export/import is implemented as a full application backup, the exported file may contain all of the above data.
+### Understanding
 
-Exact key names are implementation details.
+The developer can explain:
+
+1. The purpose of the feature.
+2. The data flow.
+3. The main functions involved.
+4. The important edge cases.
+5. How the feature could fail.
 
 ---
 
-# 23. Security / Privacy
+# 19. Current Project Status
 
-V1 stores data locally in the user's browser.
+## Implemented
 
-No personal workout data should be sent to a server because V1 has no backend.
+* [x] Workout day selection
+* [x] Date selection
+* [x] Routine display
+* [x] Set logging
+* [x] Weight logging
+* [x] Rep logging
+* [x] Set completion checkbox
+* [x] Skip exercise
+* [x] Add exercise
+* [x] Add/remove sets
+* [x] Copy weight across sets
+* [x] Previous-set display
+* [x] Previous-weight prefill
+* [x] Workout saving
+* [x] Workout editing
+* [x] Workout deletion
+* [x] Past workout logging
+* [x] Workout history
+* [x] Training-volume calculation
+* [x] Exercise progression
+* [x] Best-weight calculation
+* [x] Estimated 1RM
+* [x] Progression graph
+* [x] Routine customization
+* [x] Local persistence
+* [x] Draft persistence
+* [x] JSON backup
+* [x] JSON restore
+* [x] Light/dark visual support
+* [x] Responsive layout
 
-The application should not request:
+## Not Implemented
 
-* passwords,
-* email addresses,
-* personal identification,
-* unnecessary permissions.
-
----
-
-# 24. Accessibility
-
-The application should provide:
-
-* readable text,
-* sufficient contrast,
-* visible focus states,
-* labels for form inputs,
-* keyboard accessibility where practical,
-* buttons with clear labels.
-
-Icons should not be the only indication of an action.
-
----
-
-# 25. Performance
-
-V1 should load quickly.
-
-Because there is:
-
-* no backend,
-* no database,
-* no authentication,
-
-the application should remain lightweight.
-
-Avoid unnecessary libraries unless they provide clear value.
-
----
-
-# 26. Acceptance Criteria
-
-V1 is considered complete when all of the following are true:
-
-## Workout
-
-* [ ] Application determines current day.
-* [ ] Correct workout is displayed.
-* [ ] User can manually select another day.
-* [ ] Sunday displays the rest-day state.
-* [ ] All six workout templates are correctly implemented.
-
-## Warm-up
-
-* [ ] Warm-up section exists.
-* [ ] Warm-up items can be marked complete.
-* [ ] Duration can be recorded.
-
-## Resistance Training
-
-* [ ] All programmed exercises are displayed.
-* [ ] Target sets/reps are displayed.
-* [ ] User can enter weight.
-* [ ] User can enter reps.
-* [ ] Each set has independent values.
-* [ ] User can add notes.
-
-## Alternatives
-
-* [ ] Exercise alternatives are available.
-* [ ] User can replace an exercise.
-* [ ] Original programmed exercise remains recorded.
-* [ ] Performed alternative is recorded correctly.
-
-## Cardio
-
-* [ ] Cardio type can be selected.
-* [ ] Duration can be recorded.
-* [ ] Distance can optionally be recorded.
-* [ ] Cardio notes can optionally be recorded.
-
-## Timer
-
-* [ ] Workout timer starts for an active workout.
-* [ ] Elapsed duration is displayed.
-* [ ] Duration is stored with the saved workout.
-
-## Saving
-
-* [ ] Workout can be saved.
-* [ ] Saved data survives page refresh.
-* [ ] Saved data survives browser restart.
-* [ ] Active workout can be restored after refresh.
-
-## Data Export / Import
-
-* [ ] User can export workout data.
-* [ ] User can import previously exported data.
-* [ ] Invalid imported data is rejected safely.
-* [ ] Destructive replacement requires confirmation.
-
-## History
-
-* [ ] Saved workouts appear in history.
-* [ ] User can open a previous workout.
-* [ ] Complete workout details are displayed.
-
-## Previous Performance
-
-* [ ] Previous exercise performance is shown when available.
-* [ ] "No previous data" is shown when unavailable.
-
-## Quality
-
-* [ ] Application works on desktop.
-* [ ] Application works on laptop.
-* [ ] Application remains usable at reduced browser widths.
-* [ ] Invalid inputs are handled.
-* [ ] No critical JavaScript errors remain in the console.
-* [ ] No workout data is silently lost.
+* [ ] Authentication
+* [ ] Backend
+* [ ] Database
+* [ ] Cloud synchronization
+* [ ] Multi-device synchronization
+* [ ] Automatic backup
+* [ ] Advanced analytics
+* [ ] Nutrition tracking
+* [ ] Body-weight tracking
+* [ ] RPE/RIR tracking
+* [ ] Rest timer
+* [ ] Personal-record system
+* [ ] AI workout recommendations
 
 ---
 
-# 27. Definition of Done
+# 20. Product Principle
 
-V1 is **Done** when a user can realistically use the tracker during a real gym session and perform this complete flow on the supported desktop/laptop interface:
+The application should remain **simple before sophisticated**.
 
-```text
-Open Tracker
-     ↓
-See today's workout
-     ↓
-Complete warm-up
-     ↓
-Start resistance training
-     ↓
-See previous performance
-     ↓
-Enter weight + reps
-     ↓
-Replace an exercise if necessary
-     ↓
-Continue logging
-     ↓
-Record cardio
-     ↓
-Add notes
-     ↓
-Review workout
-     ↓
-Save
-     ↓
-Close browser
-     ↓
-Open tracker later
-     ↓
-Historical workout still exists
-```
+The primary loop is:
 
-If this workflow works reliably, **V1 has achieved its purpose.**
+> **Plan → Train → Record → Review → Improve**
 
----
+Every future feature should be evaluated against this loop.
 
-# 28. Future Roadmap
-
-These features are intentionally reserved for future versions.
-
-## V2 — Progress Analytics
-
-Potential features:
-
-* Exercise progression graphs
-* Total training volume
-* Personal records
-* Weekly/monthly statistics
-* Workout streaks
-* Training consistency
-* Exercise history graphs
-
-## V3 — Customization
-
-Potential features:
-
-* Custom exercises
-* Custom workouts
-* Editable rep ranges
-* Custom alternatives
-* Exercise database management
-* Import/export data
-* Backup/restore
-
-## V4 — Intelligence
-
-Potential features:
-
-* Progression suggestions
-* Plateau detection
-* AI workout summaries
-* Natural-language workout queries
-* AI-assisted training analysis
-
-## V5 — Full Application
-
-Potential features:
-
-* Backend
-* Database
-* Authentication
-* Cloud synchronization
-* Multi-device access
-
----
-
-# 29. Product Principle
-
-The most important principle for V1 is:
-
-> **The tracker should make recording training easier, not make training itself more complicated.**
-
-The application should never become more difficult to use than writing the workout down manually.
-
-Every feature should justify its existence by improving one of these:
-
-1. **Logging**
-2. **Recall**
-3. **Consistency**
-4. **Progress visibility**
-
-If a feature does not significantly improve one of those areas, it should wait for a later version.
-
----
-
-# 30. V1 Success Criteria
-
-The project succeeds if the user can consistently use it during real gym sessions without friction.
-
-The primary success metric is therefore:
-
-> **Can the user accurately record a complete workout in the tracker while spending minimal attention on the application itself?**
-
-The application is a **tracking tool**, not the workout.
-
-The user's training remains the primary activity.
+If a feature increases complexity without significantly improving workout tracking, progression analysis, or decision-making, it should not be prioritized.

@@ -1,83 +1,421 @@
 <!DOCTYPE html>
 <html lang="en">
+s
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gym Progression Tracker</title>
-  <link rel="stylesheet" href="css/variables.css">
-  <link rel="stylesheet" href="css/reset.css">
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/responsive.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gym Tracker</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card: #fff;
+      --tx: #14171c;
+      --mu: #6b7280;
+      --ac: #e8590c;
+      --bd: #e3e5e9;
+      --ok: #2f9e44;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    @media (prefers-color-scheme:dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #101216;
+        --card: #1a1d23;
+        --tx: #eceef2;
+        --mu: #8b93a1;
+        --bd: #2a2e36
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #101216;
+      --card: #1a1d23;
+      --tx: #eceef2;
+      --mu: #8b93a1;
+      --bd: #2a2e36
+    }
+
+    html {
+      scroll-padding-top: env(safe-area-inset-top, 0px)
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--tx);
+      font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 12px 12px 90px
+    }
+
+    nav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      background: var(--card);
+      border-top: 1px solid var(--bd);
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    nav button {
+      flex: 1;
+      padding: 14px 4px;
+      background: none;
+      border: 0;
+      color: var(--mu);
+      font-weight: 600;
+      font-size: 13px
+    }
+
+    nav button.on {
+      color: var(--ac);
+      box-shadow: inset 0 2px 0 var(--ac)
+    }
+
+    h2 {
+      margin: 6px 0 10px;
+      font-size: 20px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--bd);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px
+    }
+
+    .mu {
+      color: var(--mu);
+      font-size: 12px
+    }
+
+    .chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      margin-bottom: 10px
+    }
+
+    .chip {
+      padding: 6px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--bd);
+      background: var(--card);
+      color: var(--tx);
+      white-space: nowrap
+    }
+
+    .chip.on {
+      background: var(--ac);
+      border-color: var(--ac);
+      color: #fff
+    }
+
+    input,
+    select {
+      background: var(--bg);
+      color: var(--tx);
+      border: 1px solid var(--bd);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 15px;
+      min-width: 0
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer
+    }
+
+    .btn {
+      background: var(--ac);
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 600
+    }
+
+    .btn.g {
+      background: none;
+      color: var(--ac);
+      border: 1px solid var(--ac)
+    }
+
+    .btn.w {
+      width: 100%
+    }
+
+    .row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 6px
+    }
+
+    .row input {
+      flex: 1;
+      width: 0
+    }
+
+    .row .n {
+      width: 22px;
+      color: var(--mu);
+      text-align: center;
+      flex: none
+    }
+
+    .x {
+      background: none;
+      border: 0;
+      color: var(--mu);
+      font-size: 18px;
+      padding: 4px 8px
+    }
+
+    .hd {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px
+    }
+
+    .skip {
+      opacity: .45
+    }
+
+    .ok {
+      accent-color: var(--ok);
+      width: 22px;
+      height: 22px;
+      flex: none
+    }
+
+    .pl {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 6px
+    }
+
+    .pl input {
+      width: 100%
+    }
+
+    svg {
+      width: 100%;
+      height: auto
+    }
+
+    .st {
+      display: flex;
+      gap: 8px
+    }
+
+    .st div {
+      flex: 1;
+      text-align: center
+    }
+
+    .st b {
+      display: block;
+      font-size: 20px
+    }
+  </style>
 </head>
+
 <body>
-  <div class="app-container">
-    <!-- Home Screen -->
-    <div id="home-screen" class="screen">
-      <header>
-        <h1>Gym Progression Tracker</h1>
-      </header>
-      <main class="home-content">
-        <section class="today-info">
-          <div class="date-display">
-            <span id="current-day" class="day-name"></span>
-            <span id="current-date" class="date"></span>
-          </div>
-          <p id="workout-status" class="status-display">Not Started</p>
-        </section>
+  <main id="v"></main>
+  <nav id="nav"></nav>
+  <script>
+    const $ = s => document.querySelector(s);
+    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const ld = k => { try { return JSON.parse(localStorage.getItem(k)) } catch (e) { return null } };
+    const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) { } };
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const ex = (n, m, a, b, c, d) => ({ n, m, smin: a, smax: b, rmin: c, rmax: d });
+    const def = () => ({
+      plan: {
+        0: { name: 'Chest + Shoulder + Triceps', ex: [ex('Bench Press', 'Chest', 3, 4, 6, 10), ex('Incline DB Press', 'Chest', 3, 3, 8, 12), ex('Shoulder Press', 'Shoulders', 3, 4, 8, 12), ex('Lateral Raise', 'Shoulders', 3, 4, 12, 15), ex('Triceps Pushdown', 'Triceps', 3, 3, 10, 15)] },
+        1: { name: 'Back + Biceps', ex: [ex('Lat Pulldown', 'Back', 3, 4, 8, 12), ex('Barbell Row', 'Back', 3, 4, 6, 10), ex('Barbell Curl', 'Biceps', 3, 3, 8, 12)] },
+        2: { name: 'Legs', ex: [ex('Squat', 'Quads', 3, 4, 6, 10), ex('Leg Curl', 'Hamstrings', 3, 3, 10, 15), ex('Calf Raise', 'Calves', 4, 4, 12, 20)] },
+        3: { name: 'Rest', ex: [] }, 4: { name: '', ex: [] }, 5: { name: '', ex: [] }, 6: { name: 'Rest', ex: [] }
+      }, logs: []
+    });
+    let S = ld('gym_data') || def(), D = ld('gym_draft'), tab = 'today', pick = null, planDay = null;
+    const save = () => sv('gym_data', S), saveD = () => sv('gym_draft', D);
+    const pad = n => String(n).padStart(2, '0');
+    const today = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) };
+    const FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const wk = s => (new Date(s + 'T00:00:00').getDay() + 6) % 7;
+    const fmt = s => new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+    const todayIdx = () => wk(today());
+    const srt = () => S.logs.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    S.logs.forEach(l => { l.year = l.year || +l.date.slice(0, 4); l.day = l.day || FULL[wk(l.date)] }); srt();
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-        <section class="day-selector">
-          <h3>Select a Day</h3>
-          <div id="day-strip" class="day-strip"></div>
-        </section>
+    function lastSets(n, date, skip) { for (let i = S.logs.length - 1; i >= 0; i--) { const L = S.logs[i]; if (L.id === skip || (date && L.date >= date)) continue; const e = L.ex.find(x => x.n === n); if (e) return e.sets } return null }
+    function mk(e, date, skip) {
+      const l = lastSets(e.n, date, skip) || []; const c = Math.max(1, +e.smin || 3);
+      return { ...e, on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
+    }
+    function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; saveD() }
+    function fromLog(l) { const di = l.di ?? wk(l.date), pl = S.plan[di]?.ex || []; D = { date: l.date, di, editId: l.id, ex: l.ex.map(e => { const p = pl.find(x => x.n === e.n) || {}; return { n: e.n, m: e.m, smin: p.smin || '', smax: p.smax || '', rmin: p.rmin || '', rmax: p.rmax || '', on: true, sets: e.sets.map(s => ({ w: s.w, r: s.r, d: true })) } }) }; saveD() }
+    function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
+    function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
 
-        <section class="quick-start">
-          <button id="start-workout-btn" class="start-workout-btn">Start Today's Workout</button>
-        </section>
-      </main>
-    </div>
+    function today_v() {
+      if (!D) openDate(today());
+      const p = S.plan[D.di];
+      let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="mu" style="margin-top:6px">✏️ Editing a saved workout. Changes update it.</div>' : ''}</div><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}">${d}</button>`).join('')}</div>
+ <div class="mu" style="margin-bottom:8px">${esc(p.name || 'No routine set')}</div>`;
+      D.ex.forEach((e, i) => {
+        const l = lastSets(e.n, D.date, D.editId);
+        h += `<div class="card ${e.on ? '' : 'skip'}"><div class="hd"><div><b>${esc(e.n)}</b> <span class="mu">${esc(e.m)}</span>
+  <div class="mu">${e.smin ? `${e.smin}-${e.smax} sets × ${e.rmin}-${e.rmax} reps` : 'Extra exercise'}${l ? ` · Last: ${l.map(s => s.w + '×' + s.r).join(', ')}` : ''}</div></div>
+  <button class="chip" data-a="tog" data-i="${i}">${e.on ? 'Skip' : 'Include'}</button></div>`;
+        if (e.on) {
+          e.sets.forEach((s, j) => {
+            h += `<div class="row"><span class="n">${j + 1}</span>
+   <input type="number" inputmode="decimal" placeholder="kg" value="${s.w}" data-f="w" data-i="${i}" data-j="${j}">
+   <input type="number" inputmode="numeric" placeholder="${e.rmin ? e.rmin + '-' + e.rmax : 'reps'}" value="${s.r}" data-f="r" data-i="${i}" data-j="${j}">
+   <input type="checkbox" class="ok" ${s.d ? 'checked' : ''} data-f="d" data-i="${i}" data-j="${j}">
+   <button class="x" data-a="ds" data-i="${i}" data-j="${j}">✕</button></div>`
+          });
+          h += `<div class="row"><button class="btn g" data-a="as" data-i="${i}">+ Set</button><button class="btn g" data-a="cp" data-i="${i}">Copy weight to all</button><button class="x" data-a="de" data-i="${i}" title="Remove">🗑</button></div>`
+        }
+        h += '</div>'
+      });
+      const known = allEx();
+      h += `<div class="card"><b>Add exercise</b><div class="row"><input list="ex" id="nx" placeholder="Exercise name"><input id="nm" placeholder="Muscle" style="max-width:110px"></div>
+ <datalist id="ex">${Object.keys(known).map(k => `<option value="${esc(k)}">`).join('')}</datalist>
+ <div class="row"><button class="btn g w" data-a="addx">+ Add to today</button></div></div>
+ <button class="btn w" data-a="fin">${D.editId ? '✔ Update Workout' : '✔ Finish & Save Workout'}</button>`;
+      return h
+    }
 
-    <!-- Workout Screen -->
-    <div id="workout-screen" class="screen">
-      <header>
-        <button id="back-home-btn" class="back-home-btn">← Home</button>
-        <div class="workout-header-mobile">
-          <span id="workout-name" class="workout-name"></span>
-        </div>
-        <div class="day-strip-wrapper">
-          <div id="day-strip" class="day-strip"></div>
-        </div>
-      </header>
-      
-      <main class="workout-content">
-        <div class="workout-summary">
-          <div id="workout-status" class="status">Not Started</div>
-        </div>
+    function hist_v() {
+      let h = '<h2>History</h2><button class="btn g w" data-a="past" style="margin-bottom:10px">+ Log / edit a past day</button>';
+      if (!S.logs.length) return h + '<div class="mu">No workouts saved yet.</div>';
+      [...new Set(S.logs.map(l => l.year))].sort((a, b) => b - a).forEach(y => {
+        const ls = S.logs.filter(l => l.year === y).reverse();
+        h += `<h3 style="margin:14px 0 8px">${y} <span class="mu">${ls.length} workouts</span></h3>`;
+        ls.forEach(l => {
+          const vol = l.ex.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.w * s.r, 0), 0);
+          h += `<details class="card"><summary><b>${fmt(l.date)}</b> · ${esc(l.name || 'Workout')} <span class="mu">${l.ex.length} ex · ${Math.round(vol)} kg vol</span></summary>
+   ${l.ex.map(e => `<div style="margin-top:8px"><b>${esc(e.n)}</b> <span class="mu">${esc(e.m)}</span><div class="mu">${e.sets.map(s => s.w + 'kg×' + s.r).join(' · ')}</div></div>`).join('')}
+   <div class="row"><button class="btn" data-a="edit" data-id="${l.id}">Edit</button><button class="btn g" data-a="dl" data-id="${l.id}">Delete</button></div></details>`
+        })
+      });
+      return h
+    }
 
-        <section class="resistance-training">
-          <h3>RESISTANCE TRAINING</h3>
-          <div id="exercises-list" class="exercises-list">
-            <!-- Exercises injected by JS -->
-          </div>
-        </section>
-      </main>
-    </div>
+    function prog_v() {
+      const names = [...new Set(S.logs.flatMap(l => l.ex.map(e => e.n)))];
+      let h = '<h2>Progression</h2>';
+      if (!names.length) return h + '<div class="mu">Save a workout to see progress.</div>';
+      if (!pick || !names.includes(pick)) pick = names[0];
+      h += `<select id="pk" style="width:100%;margin-bottom:10px">${names.map(n => `<option ${n === pick ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+      const pts = S.logs.map(l => {
+        const e = l.ex.find(x => x.n === pick); if (!e || !e.sets.length) return null;
+        const top = e.sets.reduce((a, s) => s.w > a.w || (s.w === a.w && s.r > a.r) ? s : a, e.sets[0]);
+        return { d: l.date, w: top.w, r: top.r, rm: Math.max(...e.sets.map(s => s.w * (1 + s.r / 30))) }
+      }).filter(Boolean);
+      const pr = Math.max(...pts.map(p => p.w)), rm = Math.max(...pts.map(p => p.rm));
+      h += `<div class="card st"><div><b>${pr}kg</b><span class="mu">Best weight</span></div><div><b>${rm.toFixed(0)}kg</b><span class="mu">Est. 1RM</span></div><div><b>${pts.length}</b><span class="mu">Sessions</span></div></div>`;
+      const W = 320, H = 150, P = 24, mx = Math.max(...pts.map(p => p.w)), mn = Math.min(...pts.map(p => p.w)), rg = (mx - mn) || 1;
+      const xy = pts.map((p, i) => [P + (pts.length > 1 ? i * (W - 2 * P) / (pts.length - 1) : (W - 2 * P) / 2), H - P - ((p.w - mn) / rg) * (H - 2 * P)]);
+      h += `<div class="card"><div class="mu">Top-set weight per session</div><svg viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${xy.map(a => a.join(',')).join(' ')}"/>
+ ${xy.map((a, i) => `<circle cx="${a[0]}" cy="${a[1]}" r="3.5" fill="var(--ac)"/><text x="${a[0]}" y="${a[1] - 8}" font-size="10" text-anchor="middle" fill="var(--mu)">${pts[i].w}</text>`).join('')}</svg></div>`;
+      h += [...pts].reverse().map(p => `<div class="card hd"><span>${p.d}</span><b>${p.w}kg × ${p.r}</b></div>`).join('');
+      return h
+    }
 
-    <!-- History Screen (simplified - not used in V1 Step 1) -->
-    <div id="history-screen" class="screen">
-      <header>
-        <button class="back-home-btn">← Home</button>
-        <h1>Workout History</h1>
-      </header>
-      
-      <main class="history-content">
-        <div class="empty-state" id="no-history">
-          No workouts recorded yet.
-        </div>
-      </main>
-    </div>
-  </div>
+    function plan_v() {
+      if (planDay == null) planDay = todayIdx();
+      const p = S.plan[planDay];
+      let h = `<h2>Routine</h2><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === planDay ? 'on' : ''}" data-a="pd" data-i="${i}">${d}</button>`).join('')}</div>
+ <input id="pn" value="${esc(p.name)}" placeholder="e.g. Chest + Shoulder + Triceps" style="width:100%;margin-bottom:10px">`;
+      p.ex.forEach((e, i) => {
+        h += `<div class="card"><div class="hd"><b>Exercise ${i + 1}</b><button class="x" data-a="pdel" data-i="${i}">✕</button></div>
+  <div class="pl"><input data-p="n" data-i="${i}" value="${esc(e.n)}" placeholder="Name"><input data-p="m" data-i="${i}" value="${esc(e.m)}" placeholder="Muscle">
+  <input type="number" data-p="smin" data-i="${i}" value="${e.smin}" placeholder="Sets min"><input type="number" data-p="smax" data-i="${i}" value="${e.smax}" placeholder="Sets max">
+  <input type="number" data-p="rmin" data-i="${i}" value="${e.rmin}" placeholder="Reps min"><input type="number" data-p="rmax" data-i="${i}" value="${e.rmax}" placeholder="Reps max"></div></div>`
+      });
+      h += `<button class="btn g w" data-a="padd">+ Add exercise to ${DAYS[planDay]}</button>
+ <div class="card" style="margin-top:16px"><b>Backup</b><div class="mu">Data is saved in this browser only.</div>
+ <div class="row"><button class="btn g" data-a="bk">Copy backup</button><button class="btn g" data-a="rs">Restore</button></div></div>`;
+      return h
+    }
 
-  <script type="module" src="js/app.js"></script>
+    const V = { today: today_v, history: hist_v, progress: prog_v, routine: plan_v };
+    function render() {
+      $('#v').innerHTML = V[tab]();
+      $('#nav').innerHTML = [['today', '🏋️ Today'], ['history', '📅 History'], ['progress', '📈 Progress'], ['routine', '⚙️ Routine']].map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="tab" data-t="${k}">${t}</button>`).join('')
+    }
+
+    document.addEventListener('click', async ev => {
+      const b = ev.target.closest('[data-a]'); if (!b) return;
+      const a = b.dataset.a, i = +b.dataset.i, j = +b.dataset.j;
+      if (a === 'tab') { tab = b.dataset.t }
+      else if (a === 'day') { const id = D.editId; newDraft(i, D.date); D.editId = id; saveD() }
+      else if (a === 'tog') { D.ex[i].on = !D.ex[i].on; saveD() }
+      else if (a === 'as') { const s = D.ex[i].sets, l = s[s.length - 1]; s.push({ w: l ? l.w : '', r: '', d: false }); saveD() }
+      else if (a === 'ds') { D.ex[i].sets.splice(j, 1); saveD() }
+      else if (a === 'de') { D.ex.splice(i, 1); saveD() }
+      else if (a === 'cp') { const w = D.ex[i].sets[0]?.w; D.ex[i].sets.forEach(s => s.w = w); saveD() }
+      else if (a === 'addx') {
+        const n = $('#nx').value.trim(), m = $('#nm').value.trim() || allEx()[n] || 'Other'; if (!n) return;
+        D.ex.push(mk({ n, m, smin: 3, smax: 3, rmin: '', rmax: '' })); saveD()
+      }
+      else if (a === 'fin') {
+        const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, sets: e.sets.filter(s => +s.r > 0).map(s => ({ w: +s.w || 0, r: +s.r })) })).filter(e => e.sets.length);
+        if (!ex.length) { alert('Enter reps for at least one set.'); return }
+        const rec = { id: D.editId || uid(), date: D.date, day: FULL[wk(D.date)], year: +D.date.slice(0, 4), di: D.di, name: S.plan[D.di].name, ex };
+        const k = S.logs.findIndex(l => l.id === rec.id); k >= 0 ? S.logs[k] = rec : S.logs.push(rec);
+        srt(); save(); D = null; sv('gym_draft', null); tab = 'history'
+      }
+      else if (a === 'edit') { const l = S.logs.find(x => x.id === b.dataset.id); if (l) { fromLog(l); tab = 'today' } }
+      else if (a === 'past') { tab = 'today' }
+      else if (a === 'dl') { if (confirm('Delete this workout?')) { S.logs = S.logs.filter(l => l.id !== b.dataset.id); if (D && D.editId === b.dataset.id) D = null; save() } }
+      else if (a === 'pd') { planDay = i }
+      else if (a === 'pdel') { S.plan[planDay].ex.splice(i, 1); save() }
+      else if (a === 'padd') { S.plan[planDay].ex.push(ex('', '', 3, 4, 8, 12)); save() }
+      else if (a === 'bk') { const t = JSON.stringify(S); try { await navigator.clipboard.writeText(t); alert('Backup copied.') } catch (e) { prompt('Copy this backup:', t) } return }
+      else if (a === 'rs') { const t = prompt('Paste backup JSON:'); if (!t) return; try { const o = JSON.parse(t); if (o.plan && o.logs) { S = o; save(); D = null } else throw 0 } catch (e) { alert('Invalid backup'); return } }
+      render()
+    });
+
+    document.addEventListener('input', ev => {
+      const t = ev.target;
+      if (t.dataset.f) { const s = D.ex[+t.dataset.i].sets[+t.dataset.j]; s[t.dataset.f] = t.dataset.f === 'd' ? t.checked : t.value; saveD() }
+      else if (t.dataset.p) { const e = S.plan[planDay].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : t.value === '' ? '' : +t.value; save() }
+      else if (t.id === 'pn') { S.plan[planDay].name = t.value; save() }
+    });
+    document.addEventListener('change', ev => {
+      if (ev.target.id === 'pk') { pick = ev.target.value; render() }
+      if (ev.target.id === 'dt') {
+        const v = ev.target.value; if (!v) return;
+        if (D.ex.some(e => e.sets.some(s => +s.r > 0)) && !confirm('Switch date? Unsaved changes on this screen will be lost.')) { render(); return }
+        openDate(v); render()
+      }
+      if (ev.target.dataset.p || ev.target.id === 'pn') { D = null }
+    });
+    render();
+  </script>
 </body>
+
 </html>
