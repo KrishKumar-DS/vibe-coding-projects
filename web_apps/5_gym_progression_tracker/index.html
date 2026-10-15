@@ -247,6 +247,7 @@
     const pad = n => String(n).padStart(2, '0');
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const safeId = v => (typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v)) ? v : uid();
 
     // ---- storage layer: reports success/failure instead of swallowing errors ----
     const readRaw = k => { try { return localStorage.getItem(k) } catch (e) { return null } };
@@ -314,7 +315,7 @@
     }
     function normLog(l) {
       if (!l || typeof l !== 'object' || !isDate(l.date)) return null;
-      return { id: (typeof l.id === 'string' && l.id) ? l.id : uid(), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: (Number.isInteger(l.di) && l.di >= 0 && l.di < 7) ? l.di : wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
+      return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: (Number.isInteger(l.di) && l.di >= 0 && l.di < 7) ? l.di : wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
     }
     function normalizeData(o) {
       return { plan: normPlan(o && o.plan), logs: (o && Array.isArray(o.logs) ? o.logs : []).map(normLog).filter(Boolean).sort(byDate) }
@@ -461,7 +462,7 @@
           const vol = l.ex.reduce((a, e) => a + e.sets.reduce((b, s) => b + s.w * s.r, 0), 0);
           h += `<details class="card"><summary><b>${fmt(l.date)}</b> · ${esc(l.name || 'Workout')} <span class="mu">${l.ex.length} ex · ${Math.round(vol)} kg vol</span></summary>
    ${l.ex.map(e => `<div style="margin-top:8px"><b>${esc(e.n)}</b> <span class="mu">${esc(e.m)}</span><div class="mu">${e.sets.map(s => s.w + 'kg×' + s.r).join(' · ')}</div></div>`).join('')}
-   <div class="row"><button class="btn" data-a="edit" data-id="${l.id}">Edit</button><button class="btn g" data-a="dl" data-id="${l.id}">Delete</button></div></details>`
+   <div class="row"><button class="btn" data-a="edit" data-id="${esc(l.id)}">Edit</button><button class="btn g" data-a="dl" data-id="${esc(l.id)}">Delete</button></div></details>`
         })
       });
       return h
