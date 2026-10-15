@@ -294,8 +294,9 @@
     const num = v => (v === '' || v == null || isNaN(+v)) ? '' : +v;
     function normRoutineEx(e) {
       if (!e || typeof e !== 'object') return null;
-      const name = e.n ?? e.name; if (typeof name !== 'string' || !name) return null;
-      return { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: name, m: String(e.m ?? e.muscle ?? ''), smin: num(e.smin ?? e.minSets), smax: num(e.smax ?? e.maxSets), rmin: num(e.rmin ?? e.minReps), rmax: num(e.rmax ?? e.maxReps) }
+      const name = e.n ?? e.name;
+      if (!('n' in e) && !('name' in e)) return null;
+      return { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: typeof name === 'string' ? name : '', m: String(e.m ?? e.muscle ?? ''), smin: num(e.smin ?? e.minSets), smax: num(e.smax ?? e.maxSets), rmin: num(e.rmin ?? e.minReps), rmax: num(e.rmax ?? e.maxReps) }
     }
     function normPlan(plan) {
       const out = {};
