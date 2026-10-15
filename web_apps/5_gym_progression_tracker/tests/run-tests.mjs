@@ -500,6 +500,51 @@ section('Fix 3 — progression handles exercises with no completed sets');
 }
 
 // =====================================================================
+section('Bug 3 — progression groups by stable identity (xid), not name');
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  plan[0].ex = [{ id: 'bp1', n: 'Barbell Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }];
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Bench Press', m: 'Chest', xid: 'bp1', sets: [{ w: 60, r: 8 }] }] },
+    { id: 'l2', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Barbell Bench Press', m: 'Chest', xid: 'bp1', sets: [{ w: 70, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const html = c.dom.get('#v').innerHTML;
+  const opts = [...html.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('renamed exercise is a single progression entry', opts.length, 1);
+  ok('entry uses the current routine name', opts[0] && opts[0][2] === 'Barbell Bench Press', opts.map(o => o[2]));
+  ok('both sessions charted together', html.includes('60') && html.includes('70'));
+  ok('stats report two sessions', /<b>2<\/b>/.test(html));
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  plan[0].ex = [{ id: 'sp1', n: 'Shoulder Press', m: 'Shoulders', smin: 3, smax: 4, rmin: 8, rmax: 12 }];
+  plan[1].ex = [{ id: 'sp2', n: 'Shoulder Press', m: 'Shoulders', smin: 3, smax: 4, rmin: 8, rmax: 12 }];
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Shoulder Press', m: 'Shoulders', xid: 'sp1', sets: [{ w: 100, r: 8 }] }] },
+    { id: 'l2', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'B', ex: [{ n: 'Shoulder Press', m: 'Shoulders', xid: 'sp2', sets: [{ w: 200, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const html = c.dom.get('#v').innerHTML;
+  const opts = [...html.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('distinct identities stay separate', opts.length, 2);
+  ok('separate identities have distinct labels', new Set(opts.map(o => o[2])).size === 2, opts.map(o => o[2]));
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Legacy Lift', m: '', xid: '', sets: [{ w: 50, r: 5 }] }] },
+    { id: 'l2', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Legacy Lift', m: '', xid: '', sets: [{ w: 55, r: 5 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('legacy logs without xid still group by name', opts.length, 1);
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

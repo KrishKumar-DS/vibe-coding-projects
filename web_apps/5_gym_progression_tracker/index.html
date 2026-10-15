@@ -469,13 +469,36 @@
     }
 
     function prog_v() {
-      const names = [...new Set(S.logs.flatMap(l => l.ex.filter(e => e.sets.length).map(e => e.n)))];
+      // Group history by stable identity (xid) so renaming a routine exercise
+      // never splits its progress; legacy logs without an xid fall back to name.
+      const keyOf = e => e.xid ? 'xid:' + e.xid : 'name:' + e.n;
+      const planName = {};
+      Object.values(S.plan).forEach(p => p.ex.forEach(e => { if (e.id) planName[e.id] = e.n }));
+      const groups = [], byKey = new Map();
+      S.logs.forEach(l => l.ex.forEach(e => {
+        if (!e.sets.length) return;
+        const key = keyOf(e), g = byKey.get(key);
+        if (g) { g.name = e.n; g.m = e.m || g.m; g.label = e.n } // S.logs is oldest-first: newest name wins
+        else { const ng = { key, xid: e.xid || '', name: e.n, m: e.m, label: e.n }; byKey.set(key, ng); groups.push(ng) }
+      }));
+      groups.forEach(g => { if (g.xid && planName[g.xid] != null) g.label = planName[g.xid] }); // prefer current routine name
+      const labelCount = {}; groups.forEach(g => (labelCount[g.label] = (labelCount[g.label] || 0) + 1));
+      const usedLabels = new Set();
+      groups.forEach(g => {
+        let label = g.label;
+        if (labelCount[label] > 1) { // different identities share a name: keep the dropdown usable
+          label = g.m ? `${label} · ${g.m}` : label;
+          let i = 2; while (usedLabels.has(label)) label = `${g.label} (${i++})`
+        }
+        usedLabels.add(label); g.label = label
+      });
       let h = '<h2>Progression</h2>';
-      if (!names.length) return h + '<div class="mu">Save a workout to see progress.</div>';
-      if (!pick || !names.includes(pick)) pick = names[0];
-      h += `<select id="pk" style="width:100%;margin-bottom:10px">${names.map(n => `<option ${n === pick ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+      if (!groups.length) return h + '<div class="mu">Save a workout to see progress.</div>';
+      const g = groups.find(x => x.key === pick) || groups[0];
+      pick = g.key;
+      h += `<select id="pk" style="width:100%;margin-bottom:10px">${groups.map(x => `<option value="${esc(x.key)}" ${x.key === pick ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>`;
       const pts = S.logs.map(l => {
-        const e = l.ex.find(x => x.n === pick); if (!e || !e.sets.length) return null;
+        const e = l.ex.find(x => g.xid ? x.xid === g.xid : (!x.xid && x.n === g.name)); if (!e || !e.sets.length) return null;
         const top = e.sets.reduce((a, s) => s.w > a.w || (s.w === a.w && s.r > a.r) ? s : a, e.sets[0]);
         return { d: l.date, w: top.w, r: top.r, rm: Math.max(...e.sets.map(s => s.w * (1 + s.r / 30))) }
       }).filter(Boolean);
