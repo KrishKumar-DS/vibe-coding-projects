@@ -1,6 +1,6 @@
 /*
  * Dependency-free regression tests for Gym Progression Tracker.
- * Loads the <script> body from index.html and runs it inside a Node vm
+ * Loads js/app.js and runs it inside a Node vm
  * context with a stubbed DOM/localStorage/navigator, then drives the app's
  * own click/input/change handlers to verify the documented bug fixes.
  *
@@ -13,11 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(__dir, '..', 'index.html'), 'utf8');
-const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
-if (!scriptMatch) throw new Error('No <script> block found in index.html');
-
-let src = scriptMatch[1];
+let src = readFileSync(join(__dir, '..', 'js', 'app.js'), 'utf8');
 src += `
 ;globalThis.__api = {
   normalizeData, validateBackup, bootState, normDraft, normLog, normLogEx,
@@ -276,6 +272,75 @@ section('Bug 6 — unsaved-changes warning on day switch');
   c.fireClick({ a: 'day', i: '0' });
   eq('dirty switch + confirm -> moved to Mon', c.api.getD().di, 0);
   ok('dirty switch + confirm -> prompt shown', c.confirms.length === 1);
+}
+
+// =====================================================================
+section('Bug A1 — discard prompt only fires after real edits (baseline diff)');
+const HISTORY_PLAN = { 0: { name: 'Push', ex: [{ id: 'bx', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }] } };
+const HISTORY_LOGS = [{ id: 'l1', date: '2026-10-05', ex: [{ n: 'Bench Press', m: 'Chest', xid: 'bx', sets: [{ w: 100, r: 8 }] }] }];
+const historySeed = () => ({ gym_data: JSON.stringify({ plan: HISTORY_PLAN, logs: HISTORY_LOGS }) });
+{
+  // the reported repro: weights auto-filled from history, user types nothing
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' }); // open a fresh Monday
+  eq('prefill still applied', String(c.api.getD().ex[0].sets[0].w), '100');
+  ok('untouched prefilled draft is not dirty', c.api.draftHasData(c.api.getD()) === false);
+  c.fireClick({ a: 'day', i: '1' }); // switch away -> must not warn
+  eq('untouched prefilled switch -> no prompt', c.confirms.length, 0);
+  eq('untouched prefilled switch -> moved to Tue', c.api.getD().date, '2026-10-13');
+}
+{
+  // a weight-only edit IS the user's work and must still count as dirty
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '105' });
+  ok('weight-only edit is dirty', c.api.draftHasData(c.api.getD()) === true);
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'day', i: '1' });
+  eq('dirty switch + cancel -> prompt asked', c.confirms.length, 1);
+  eq('dirty switch + cancel -> date unchanged', c.api.getD().date, '2026-10-12');
+}
+{
+  // structural edits count, and reverting them back to the baseline is clean again
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' });
+  ok('baseline draft clean', c.api.draftHasData(c.api.getD()) === false);
+  c.fireClick({ a: 'as', i: '0' });
+  ok('added set is dirty', c.api.draftHasData(c.api.getD()) === true);
+  c.fireClick({ a: 'ds', i: '0', j: '2' });
+  ok('reverted to baseline -> clean again', c.api.draftHasData(c.api.getD()) === false);
+  c.fireClick({ a: 'tog', i: '0' });
+  ok('skip toggle is dirty', c.api.draftHasData(c.api.getD()) === true);
+}
+{
+  // the baseline survives a save -> reload round trip (normDraft carries base)
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' });
+  ok('draft persisted with baseline', !!c.store.get('gym_draft'));
+  const c2 = app({ seed: { gym_data: c.store.get('gym_data'), gym_draft: c.store.get('gym_draft') } });
+  ok('reloaded untouched draft still clean', c2.api.draftHasData(c2.api.getD()) === false);
+  c2.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  ok('reloaded draft still detects edits', c2.api.draftHasData(c2.api.getD()) === true);
+}
+{
+  // edit sessions use the baseline too: untouched opens are clean, edits are not
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  ok('untouched edit session is clean', c.api.draftHasData(c.api.getD()) === false);
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  ok('modified edit session is dirty', c.api.draftHasData(c.api.getD()) === true);
+}
+{
+  // legacy draft without a baseline: weight-only can't be trusted (auto-fill is
+  // indistinguishable from typing), but reps/completed still flag dirty
+  const legacy = sets => JSON.stringify({
+    date: '2026-10-13', di: 1, editId: '',
+    ex: [{ xid: '', n: 'Extra', m: '', smin: '', smax: '', rmin: '', rmax: '', on: true, sets }],
+  });
+  const cW = app({ seed: { gym_data: DEFAULTS, gym_draft: legacy([{ w: '50', r: '', d: false }]) } });
+  ok('legacy weight-only draft -> no false dirty', cW.api.draftHasData(cW.api.getD()) === false);
+  const cR = app({ seed: { gym_data: DEFAULTS, gym_draft: legacy([{ w: '50', r: '5', d: false }]) } });
+  ok('legacy reps draft -> dirty', cR.api.draftHasData(cR.api.getD()) === true);
 }
 
 // =====================================================================
