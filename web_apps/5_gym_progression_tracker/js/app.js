@@ -6,16 +6,6 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const safeId = v => (typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v)) ? v : uid();
 
-const readRaw = k => { try { return localStorage.getItem(k) } catch (e) { return null } };
-const ld = k => { const r = readRaw(k); if (r == null) return null; try { return JSON.parse(r) } catch (e) { return null } };
-let storageWarned = false;
-function notifyStorageFailure() {
-    if (storageWarned) return;
-    storageWarned = true;
-    alert('Some changes could not be saved to this browser\'s storage (it may be full or blocked). They may be lost if you reload.');
-}
-const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); storageWarned = false; return true } catch (e) { return false } };
-
 
 const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const today = () => iso(new Date());
@@ -116,7 +106,7 @@ function recoverCopy(rawStr, why) {
     try { alert('Your saved workout data was unreadable (' + why + '). A recovery copy was kept in this browser, and default data has been loaded.') } catch (e) { }
 }
 function bootState() {
-    const rawStr = readRaw('gym_data');
+    const rawStr = Store.readRaw('gym_data');
     if (rawStr == null) return { S: def(), persist: false };
     let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON'); return { S: def(), persist: false } }
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure'); return { S: def(), persist: false } }
@@ -125,10 +115,10 @@ function bootState() {
 }
 
 let S, D, tab = 'today', pick = null, planDay = null;
-const save = () => sv('gym_data', S), saveD = () => sv('gym_draft', D);
+const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
-D = normDraft(ld('gym_draft'));
+D = normDraft(Store.loadDraft());
 backfillXids();
 if (boot.persist) save();
 
@@ -155,7 +145,7 @@ function mk(e, date, skip) {
     const c = Math.max(1, +e.smin || 3);
     return { xid: e.id || '', n: e.n, m: e.m, smin: e.smin || '', smax: e.smax || '', rmin: e.rmin || '', rmax: e.rmax || '', on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
-function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); if (!saveD()) notifyStorageFailure() }
+function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); if (!saveD()) Store.notifyStorageFailure() }
 function fromLog(l) {
     const di = wk(l.date), pl = S.plan[di]?.ex || [];
     D = {
@@ -165,7 +155,7 @@ function fromLog(l) {
         })
     };
     D.base = JSON.stringify(D.ex); // baseline for draftHasData: the auto-loaded state is not "unsaved work"
-    if (!saveD()) notifyStorageFailure()
+    if (!saveD()) Store.notifyStorageFailure()
 }
 function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
 function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
@@ -305,17 +295,17 @@ document.addEventListener('click', async ev => {
         const nv = dateForWeekday(i, D.date);
         if (nv > today()) return; // never allow selecting a future date
         if (nv === D.date) return;
-        if (D.editId) { D.date = nv; D.di = wk(nv); if (!saveD()) notifyStorageFailure() }
+        if (D.editId) { D.date = nv; D.di = wk(nv); if (!saveD()) Store.notifyStorageFailure() }
         else { if (!mayDiscard()) { render(); return } openDate(nv) }
     }
-    else if (a === 'tog') { D.ex[i].on = !D.ex[i].on; if (!saveD()) notifyStorageFailure() }
-    else if (a === 'as') { const s = D.ex[i].sets, l = s[s.length - 1]; s.push({ w: l ? l.w : '', r: '', d: false }); if (!saveD()) notifyStorageFailure() }
-    else if (a === 'ds') { D.ex[i].sets.splice(j, 1); if (!saveD()) notifyStorageFailure() }
-    else if (a === 'de') { D.ex.splice(i, 1); if (!saveD()) notifyStorageFailure() }
-    else if (a === 'cp') { const w = D.ex[i].sets[0]?.w; D.ex[i].sets.forEach(s => s.w = w); if (!saveD()) notifyStorageFailure() }
+    else if (a === 'tog') { D.ex[i].on = !D.ex[i].on; if (!saveD()) Store.notifyStorageFailure() }
+    else if (a === 'as') { const s = D.ex[i].sets, l = s[s.length - 1]; s.push({ w: l ? l.w : '', r: '', d: false }); if (!saveD()) Store.notifyStorageFailure() }
+    else if (a === 'ds') { D.ex[i].sets.splice(j, 1); if (!saveD()) Store.notifyStorageFailure() }
+    else if (a === 'de') { D.ex.splice(i, 1); if (!saveD()) Store.notifyStorageFailure() }
+    else if (a === 'cp') { const w = D.ex[i].sets[0]?.w; D.ex[i].sets.forEach(s => s.w = w); if (!saveD()) Store.notifyStorageFailure() }
     else if (a === 'addx') {
         const n = $('#nx').value.trim(), m = $('#nm').value.trim() || allEx()[n] || 'Other'; if (!n) return;
-        D.ex.push(mk({ n, m, smin: 3, smax: 3, rmin: '', rmax: '' })); if (!saveD()) notifyStorageFailure()
+        D.ex.push(mk({ n, m, smin: 3, smax: 3, rmin: '', rmax: '' })); if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
         const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: +s.w || 0, r: +s.r })) })).filter(e => e.sets.length);
@@ -330,7 +320,7 @@ document.addEventListener('click', async ev => {
         S.logs.push(rec);
         S.logs.sort(byDate);
         if (!save()) { S.logs = prevLogs; alert('Could not save to this browser\'s storage (it may be full or blocked). Your workout is kept on this screen — free up space and try again.'); return }
-        D = null; if (!sv('gym_draft', null)) notifyStorageFailure(); tab = 'history'
+        D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'
     }
     else if (a === 'edit') { const l = S.logs.find(x => x.id === b.dataset.id); if (l) { fromLog(l); tab = 'today' } }
     else if (a === 'past') { tab = 'today' }
@@ -339,12 +329,12 @@ document.addEventListener('click', async ev => {
             const prev = S.logs;
             S.logs = S.logs.filter(l => l.id !== b.dataset.id);
             if (!save()) { S.logs = prev; alert('Could not update storage; the workout was not deleted.'); return }
-            if (D && D.editId === b.dataset.id) { D = null; if (!sv('gym_draft', null)) notifyStorageFailure() }
+            if (D && D.editId === b.dataset.id) { D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure() }
         }
     }
     else if (a === 'pd') { planDay = i }
-    else if (a === 'pdel') { S.plan[planDay].ex.splice(i, 1); if (!save()) notifyStorageFailure() }
-    else if (a === 'padd') { S.plan[planDay].ex.push(ex('', '', 3, 4, 8, 12)); if (!save()) notifyStorageFailure() }
+    else if (a === 'pdel') { S.plan[planDay].ex.splice(i, 1); if (!save()) Store.notifyStorageFailure() }
+    else if (a === 'padd') { S.plan[planDay].ex.push(ex('', '', 3, 4, 8, 12)); if (!save()) Store.notifyStorageFailure() }
     else if (a === 'bk') { const t = JSON.stringify(S); try { await navigator.clipboard.writeText(t); alert('Backup copied.') } catch (e) { prompt('Copy this backup:', t) } return }
     else if (a === 'rs') {
         const t = prompt('Paste backup JSON:'); if (!t) return;
@@ -355,16 +345,16 @@ document.addEventListener('click', async ev => {
         S = normalizeData(o);
         backfillXids();
         if (!save()) { S = prev; alert('Invalid backup: could not write to storage.'); return }
-        D = null; if (!sv('gym_draft', null)) notifyStorageFailure(); tab = 'history'; alert('Backup restored.')
+        D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'; alert('Backup restored.')
     }
     render()
 });
 
 document.addEventListener('input', ev => {
     const t = ev.target;
-    if (t.dataset.f) { const s = D.ex[+t.dataset.i].sets[+t.dataset.j]; s[t.dataset.f] = t.dataset.f === 'd' ? t.checked : t.value; if (!saveD()) notifyStorageFailure() }
-    else if (t.dataset.p) { const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : t.value === '' ? '' : +t.value; if (!save()) notifyStorageFailure() }
-    else if (t.id === 'pn') { S.plan[planDay].name = t.value; if (!save()) notifyStorageFailure() }
+    if (t.dataset.f) { const s = D.ex[+t.dataset.i].sets[+t.dataset.j]; s[t.dataset.f] = t.dataset.f === 'd' ? t.checked : t.value; if (!saveD()) Store.notifyStorageFailure() }
+    else if (t.dataset.p) { const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : t.value === '' ? '' : +t.value; if (!save()) Store.notifyStorageFailure() }
+    else if (t.id === 'pn') { S.plan[planDay].name = t.value; if (!save()) Store.notifyStorageFailure() }
 });
 document.addEventListener('change', ev => {
     if (ev.target.id === 'pk') { pick = ev.target.value; render() }
@@ -375,7 +365,7 @@ document.addEventListener('change', ev => {
         if (v === D.date) { render(); return }
         if (D.editId) {
             if (S.logs.find(l => l.id !== D.editId && l.date === v)) { alert('Another workout already exists on ' + v + '. Choose another date or cancel the edit.'); render(); return }
-            D.date = v; D.di = wk(v); if (!saveD()) notifyStorageFailure()
+            D.date = v; D.di = wk(v); if (!saveD()) Store.notifyStorageFailure()
         }
         else { if (!mayDiscard()) { render(); return } openDate(v) }
         render()
