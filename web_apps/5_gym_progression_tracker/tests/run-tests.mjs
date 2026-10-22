@@ -13,7 +13,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
-let src = readFileSync(join(__dir, '..', 'js', 'app.js'), 'utf8');
+// Load the storage adapter first so `Store` exists when app.js runs.
+let src =
+  readFileSync(join(__dir, '..', 'js', 'store.js'), 'utf8') + '\n' +
+  readFileSync(join(__dir, '..', 'js', 'app.js'), 'utf8');
 src += `
 ;globalThis.__api = {
   normalizeData, validateBackup, bootState, normDraft, normLog, normLogEx,
