@@ -4,13 +4,6 @@ A simple Pomodoro Timer web application built using HTML, CSS, and JavaScript.
 
 ---
 
-## Date
-
-* **Started:** 2026-08-01
-* **Completed:** 2026-08-03
-
----
-
 ## Features
 
 - Preset timer durations
