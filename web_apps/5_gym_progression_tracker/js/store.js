@@ -25,6 +25,8 @@ const Store = (() => {
         loadDraft() { return ld('gym_draft'); },
         saveData(S) { return sv('gym_data', S); },
         saveDraft(D) { return sv('gym_draft', D); },
+        loadTheme() { return ld('gym_theme') || 'system'; },
+        saveTheme(t) { return sv('gym_theme', t); },
         flush() { return Promise.resolve(); },
         online() { return true; },
         // Exposed for gradual migration: app.js still calls these directly

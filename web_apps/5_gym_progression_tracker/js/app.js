@@ -5,6 +5,7 @@ const pad = n => String(n).padStart(2, '0');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const safeId = v => (typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v)) ? v : uid();
+const themeLabel = t => ({ light: 'Light', dark: 'Dark', system: 'System' }[t] || t);
 
 
 const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
@@ -121,6 +122,20 @@ S = boot.S;
 D = normDraft(Store.loadDraft());
 backfillXids();
 if (boot.persist) save();
+
+// Theme persistence (light / dark / system). Applies before first render.
+const THEMES = ['light', 'dark', 'system'];
+let theme = Store.loadTheme() || 'system';
+function applyTheme(t) {
+    theme = t;
+    const de = document.documentElement;
+    if (de) {
+        if (t === 'system') de.removeAttribute('data-theme');
+        else de.dataset.theme = t;
+    }
+    Store.saveTheme(t);
+}
+applyTheme(theme);
 
 
 function canNameMatch(name) {
@@ -277,7 +292,9 @@ function plan_v() {
     });
     h += `<button class="btn g w" data-a="padd">+ Add exercise to ${DAYS[planDay]}</button>
  <div class="card" style="margin-top:16px"><b>Backup</b><div class="mu">Data is saved in this browser only.</div>
- <div class="row"><button class="btn g" data-a="bk">Copy backup</button><button class="btn g" data-a="rs">Restore</button></div></div>`;
+ <div class="row"><button class="btn g" data-a="bk">Copy backup</button><button class="btn g" data-a="rs">Restore</button></div></div>
+ <div class="card" style="margin-top:10px"><b>Theme</b><div class="mu">Appearance follows your system by default.</div>
+ <div class="row"><button class="btn g" data-a="theme">Theme: ${themeLabel(theme)}</button></div></div>`;
     return h
 }
 
@@ -346,6 +363,10 @@ document.addEventListener('click', async ev => {
         backfillXids();
         if (!save()) { S = prev; alert('Invalid backup: could not write to storage.'); return }
         D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'; alert('Backup restored.')
+    }
+    else if (a === 'theme') {
+        const cur = THEMES.indexOf(theme);
+        applyTheme(THEMES[(cur + 1) % THEMES.length]);
     }
     render()
 });
