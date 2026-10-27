@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **151 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **182 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 1 | P1 | Draft safety | History → Edit silently discards an unsaved draft |
 | 2 | P1 | Exercise identity | “Add exercise” loses identity, prefills from the wrong date, and can duplicate Progress entries |
 | 3 | P1 | Data validation | Negative weights are accepted and saved |
 | 4 | P1 | Import integrity | Duplicate workout IDs are accepted |
@@ -39,7 +38,6 @@
 | 22 | P2 | Import integrity | Validator silently drops malformed log exercises/sets; accepts empty workouts |
 | 23 | P2 | Import integrity | Future-dated workouts are accepted on restore and boot |
 | 24 | P2 | Workout editing | Duplicate exercise can be added to one workout |
-| 25 | P2 | Draft safety | Date-only edit changes are not considered dirty |
 | 26 | P2 | Editing | Duplicate imported dates make both workouts uneditable |
 | 27 | P3 | Draft safety | Deleting the currently edited workout discards a dirty draft |
 | 28 | P3 | Progression UX | Empty routine names and suffix logic break Progress labels |
@@ -53,60 +51,16 @@
 
 ### Recommended patch order
 
-1. Items **1–3** — data loss, incorrect saved data, and wrong prefill.
+1. Items **2–3** — data loss, incorrect saved data, and wrong prefill.
 2. Items **4–6** — import integrity and edit semantics.
 3. Items **7–11** — dead ends, invalid data, and escaping.
 4. Items **12–16** — quick UI/reliability improvements.
 5. Items **17–18** — documentation and regression coverage.
-6. Follow-up items **19–20, 21–26, 27–33** — treat 19–20 as P1 and schedule them with the first data-integrity pass, then work down the remaining follow-up priorities.
+6. Follow-up items **19–20, 21–24, 26–33** — treat 19–20 as P1 and schedule them with the first data-integrity pass, then work down the remaining follow-up priorities.
 
 ---
 
 # Priority 1 — Data loss or incorrect saved data
-
-## 1. History → Edit silently discards an unsaved draft
-
-**Priority:** P1
-**Where:** `js/app.js:342`
-
-### Problem
-
-The Edit action calls `fromLog(l)`, which immediately replaces the current draft. `mayDiscard()` is only used when changing the date or weekday, so this path loses a dirty draft without asking.
-
-### Reproduction
-
-1. Open the Today view.
-2. Enter repetitions for any set.
-3. Switch to History.
-4. Click **Edit** on an old workout.
-
-Result: the unsaved draft is replaced with the saved workout. No confirmation is shown.
-
-### Fix
-
-Guard the edit action before replacing `D`:
-
-```js
-else if (a === 'edit') {
-    const l = S.logs.find(x => x.id === b.dataset.id);
-    if (l) {
-        if (!mayDiscard()) { render(); return; }
-        fromLog(l);
-        tab = 'today';
-    }
-}
-```
-
-### Acceptance
-
-- Editing while the draft is clean proceeds immediately.
-- Editing while the draft is dirty prompts first.
-- Cancelling the prompt leaves the draft unchanged.
-- Confirming opens the selected workout for editing.
-
-> **Follow-up note:** `mayDiscard()` currently compares only `D.ex` against `D.base`, so a date-only edit move still counts as clean. Item **25** covers the additional date-aware dirty tracking required for this guard to work fully.
-
----
 
 ## 2. “Add exercise” has three related identity and prefill bugs
 
@@ -539,8 +493,6 @@ Then proceed with normalization and replacement.
 - Cancelling leaves both the current data and draft unchanged.
 - Confirming performs the replacement.
 
-> **Follow-up note:** the same date-aware dirty baseline gap in item **25** means a pending date-only edit move will not trigger this prompt.
-
 ---
 
 ## 11. Stored values are inserted into HTML without escaping
@@ -802,35 +754,33 @@ Or use `Map` consistently.
 
 Add tests for:
 
-1. History → Edit with a dirty draft prompts and preserves the draft on cancel.
-2. Restore with a dirty draft prompts and preserves the draft on cancel.
-3. Custom exercise identity:
+1. Restore with a dirty draft prompts and preserves the draft on cancel.
+2. Custom exercise identity:
    - Known routine exercise reuses `xid`.
    - Prefill is bounded by the selected date.
    - Saving does not create a duplicate Progress entry.
-4. Negative weights are clamped.
-5. Duplicate log IDs are regenerated.
-6. Inconsistent `di` values are derived from the date.
-7. Editing a workout across weekdays preserves the original routine name.
-8. Weekday-chip date conflict while editing is blocked immediately.
-9. Draft and theme injection payloads remain escaped.
-10. Invalid theme values fall back to `system`.
-11. Routine validation rejects blank names and inverted ranges.
-12. Disabled future-day chips are rendered as disabled.
-13. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
-14. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-15. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-16. Restore and boot reject future-dated workouts.
-17. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-18. Date-only edit changes are detected as dirty and trigger the discard prompt.
-19. Imported duplicate dates do not make both records uneditable.
-20. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-21. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-22. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-23. A valid backup whose write fails reports a storage failure, not an invalid backup.
-24. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-25. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-26. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+3. Negative weights are clamped.
+4. Duplicate log IDs are regenerated.
+5. Inconsistent `di` values are derived from the date.
+6. Editing a workout across weekdays preserves the original routine name.
+7. Weekday-chip date conflict while editing is blocked immediately.
+8. Draft and theme injection payloads remain escaped.
+9. Invalid theme values fall back to `system`.
+10. Routine validation rejects blank names and inverted ranges.
+11. Disabled future-day chips are rendered as disabled.
+12. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+13. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
+14. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
+15. Restore and boot reject future-dated workouts.
+16. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
+17. Imported duplicate dates do not make both records uneditable.
+18. Deleting the currently edited workout with dirty changes warns before discarding the draft.
+19. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
+20. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
+21. A valid backup whose write fails reports a storage failure, not an invalid backup.
+22. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
+23. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
+24. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
 ### Acceptance
 
@@ -1068,39 +1018,6 @@ Result: two Bench Press entries in History and doubled volume; Progress may show
 - Volume is not double-counted.
 - The add form clears after a successful add.
 - Re-rendering does not silently erase text the user is still editing.
-
----
-
-## 25. Date-only edit changes are not considered dirty
-
-**Priority:** P2
-**Where:** `js/app.js:163`, `js/app.js:172` (baseline creation), `js/app.js:181-185` (`draftHasData`), `js/app.js:315`, `js/app.js:389`
-
-### Problem
-
-`D.base` stores only `JSON.stringify(D.ex)`, not `D.date` or `D.di`. Changing only the date of an edited workout therefore leaves the draft “clean,” so History → Edit, Restore, or any future `mayDiscard()` guard will replace it without a prompt and silently lose the pending date move.
-
-### Reproduction
-
-1. Edit a saved workout dated 2026-10-05.
-2. Click the Wednesday chip to move it to 2026-10-07 without changing any sets.
-3. Confirm `draftHasData()` returns `false`.
-4. Click Edit on another workout.
-
-Result: the date move is discarded with no confirmation.
-
-### Fix
-
-- Include the date in the dirty baseline, or track a separate `dateDirty`/`pendingDate` flag.
-- Keep backward compatibility with drafts whose `base` is an exercise-array string.
-- Add tests for date-only moves in both History → Edit and Restore.
-
-### Acceptance
-
-- A pending date move triggers the unsaved-draft prompt.
-- Cancelling preserves the moved draft.
-- Reloading preserves both the date move and the dirty state.
-- The fixes for items **1** and **10** work for date-only changes.
 
 ---
 
@@ -1364,9 +1281,8 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `151 passed, 0 failed` plus new tests.
+- [ ] `node tests/run-tests.mjs` → `182 passed, 0 failed` plus new tests.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
-- [ ] History → Edit with a dirty draft prompts.
 - [ ] Restore with a dirty draft prompts.
 - [ ] Adding a known routine exercise prefills correctly and does not duplicate Progress.
 - [ ] Adding a custom exercise while logging a past date does not prefill from a later workout.
@@ -1389,7 +1305,6 @@ After applying the fixes, verify:
 - [ ] Malformed imported exercises/sets are rejected or reported, not silently dropped.
 - [ ] Future-dated workouts cannot enter through restore or boot.
 - [ ] Adding the same exercise twice does not double volume or create duplicate Progress entries.
-- [ ] Date-only edit moves trigger the dirty-draft warning.
 - [ ] Duplicate imported dates are rejected or remain editable.
 - [ ] Deleting a dirty workout that is open in the draft warns before discarding edits.
 - [ ] Blank routine names never blank out recorded Progress labels; duplicate suffixes keep muscle context.
