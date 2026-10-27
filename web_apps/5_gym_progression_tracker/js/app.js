@@ -339,7 +339,13 @@ document.addEventListener('click', async ev => {
         if (!save()) { S.logs = prevLogs; alert('Could not save to this browser\'s storage (it may be full or blocked). Your workout is kept on this screen — free up space and try again.'); return }
         D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'
     }
-    else if (a === 'edit') { const l = S.logs.find(x => x.id === b.dataset.id); if (l) { fromLog(l); tab = 'today' } }
+    else if (a === 'edit') {
+        const l = S.logs.find(x => x.id === b.dataset.id);
+        if (l) {
+            if (!mayDiscard()) { render(); return }
+            fromLog(l); tab = 'today'
+        }
+    }
     else if (a === 'past') { tab = 'today' }
     else if (a === 'dl') {
         if (confirm('Delete this workout?')) {

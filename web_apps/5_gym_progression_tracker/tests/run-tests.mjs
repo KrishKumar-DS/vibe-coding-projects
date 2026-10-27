@@ -347,6 +347,49 @@ const historySeed = () => ({ gym_data: JSON.stringify({ plan: HISTORY_PLAN, logs
 }
 
 // =====================================================================
+section('Bug 1 — History Edit warns before discarding a dirty draft');
+{
+  // clean draft: opening another workout must not prompt
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' }); // Monday draft with a baseline
+  c.fireClick({ a: 'edit', id: 'l1' });
+  eq('clean draft -> no prompt', c.confirms.length, 0);
+  eq('clean draft -> selected workout opens', c.api.getD().editId, 'l1');
+  eq('clean draft -> switched to today', c.api.getTab(), 'today');
+}
+{
+  // dirty draft + cancel: prompt first, draft and stored copy untouched
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '5' });
+  ok('typed reps make the draft dirty', c.api.draftHasData(c.api.getD()) === true);
+  c.fireClick({ a: 'tab', t: 'history' });
+  const draftBefore = c.store.get('gym_draft');
+  const dateBefore = c.api.getD().date;
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'edit', id: 'l1' });
+  eq('dirty draft -> prompt asked', c.confirms.length, 1);
+  ok('cancel -> selected workout not opened', c.api.getD().editId !== 'l1');
+  eq('cancel -> draft date unchanged', c.api.getD().date, dateBefore);
+  eq('cancel -> typed reps preserved', c.api.getD().ex[0].sets[0].r, '5');
+  eq('cancel -> stored draft unchanged', c.store.get('gym_draft'), draftBefore);
+  eq('cancel -> stays on history', c.api.getTab(), 'history');
+}
+{
+  // dirty draft + confirm: the selected workout replaces the draft
+  const c = app({ seed: historySeed() });
+  c.fireClick({ a: 'day', i: '0' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '5' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'edit', id: 'l1' });
+  eq('dirty draft + confirm -> prompt asked', c.confirms.length, 1);
+  eq('dirty draft + confirm -> selected workout opens', c.api.getD().editId, 'l1');
+  eq('dirty draft + confirm -> workout date loaded', c.api.getD().date, '2026-10-05');
+  eq('dirty draft + confirm -> switched to today', c.api.getTab(), 'today');
+}
+
+// =====================================================================
 section('Date selector — future weekdays disabled, correct weekday mapping');
 {
   const c = app({});
