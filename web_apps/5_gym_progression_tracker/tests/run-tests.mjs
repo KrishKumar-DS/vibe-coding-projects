@@ -389,6 +389,80 @@ section('Bug 1 — History Edit warns before discarding a dirty draft');
   eq('dirty draft + confirm -> switched to today', c.api.getTab(), 'today');
 }
 
+const twoLogSeed = () => ({
+  gym_data: JSON.stringify({
+    plan: HISTORY_PLAN,
+    logs: [
+      { id: 'l1', date: '2026-10-05', ex: [{ n: 'Bench Press', m: 'Chest', xid: 'bx', sets: [{ w: 100, r: 8 }] }] },
+      { id: 'l2', date: '2026-10-12', ex: [{ n: 'Bench Press', m: 'Chest', xid: 'bx', sets: [{ w: 95, r: 8 }] }] },
+    ],
+  }),
+});
+{
+  // a date-only move is unsaved work too (date picker path)
+  const c = app({ seed: twoLogSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  ok('date-only move makes the edit draft dirty', c.api.draftHasData(c.api.getD()) === true);
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'edit', id: 'l2' });
+  eq('date-only move + cancel -> prompt asked', c.confirms.length, 1);
+  eq('date-only move + cancel -> other workout not opened', c.api.getD().editId, 'l1');
+  eq('date-only move + cancel -> moved date preserved', c.api.getD().date, '2026-10-06');
+}
+{
+  // confirming discards the pending move and opens the chosen workout
+  const c = app({ seed: twoLogSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'edit', id: 'l2' });
+  eq('date-only move + confirm -> prompt asked', c.confirms.length, 1);
+  eq('date-only move + confirm -> other workout opens', c.api.getD().editId, 'l2');
+  eq('date-only move + confirm -> other workout date loaded', c.api.getD().date, '2026-10-12');
+}
+{
+  // reverting the date makes the draft clean again
+  const c = app({ seed: twoLogSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  ok('date-only move is dirty before revert', c.api.draftHasData(c.api.getD()) === true);
+  c.fireChange({ id: 'dt', value: '2026-10-05' });
+  ok('date reverted to baseline -> clean again', c.api.draftHasData(c.api.getD()) === false);
+}
+{
+  // the weekday-chip path while editing must also mark the draft dirty
+  const c = app({ seed: twoLogSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireClick({ a: 'day', i: '1' }); // Monday 10-05 -> Tuesday 10-06
+  eq('chip move while editing -> date changed', c.api.getD().date, '2026-10-06');
+  ok('chip move while editing -> draft dirty', c.api.draftHasData(c.api.getD()) === true);
+}
+{
+  // the date baseline and dirty state survive a reload
+  const c = app({ seed: twoLogSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  const c2 = app({ seed: { gym_data: c.store.get('gym_data'), gym_draft: c.store.get('gym_draft') } });
+  eq('reload keeps moved date', c2.api.getD().date, '2026-10-06');
+  eq('reload keeps date baseline', c2.api.getD().baseDate, '2026-10-05');
+  ok('reload keeps date dirty', c2.api.draftHasData(c2.api.getD()) === true);
+}
+{
+  // drafts from before baseDate existed upgrade on load without a false dirty
+  const c0 = app({ seed: historySeed() });
+  c0.fireClick({ a: 'edit', id: 'l1' });
+  const legacy = JSON.parse(c0.store.get('gym_draft'));
+  delete legacy.baseDate;
+  const c = app({ seed: { gym_data: c0.store.get('gym_data'), gym_draft: JSON.stringify(legacy) } });
+  ok('legacy baseline draft loads clean', c.api.draftHasData(c.api.getD()) === false);
+  eq('legacy baseline draft upgrades baseDate', c.api.getD().baseDate, c.api.getD().date);
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  ok('upgraded legacy draft detects later date moves', c.api.draftHasData(c.api.getD()) === true);
+}
+
 // =====================================================================
 section('Date selector — future weekdays disabled, correct weekday mapping');
 {

@@ -69,7 +69,7 @@ function normalizeData(o) {
 }
 function normDraft(d) {
     if (!d || typeof d !== 'object' || !isDate(d.date) || !Array.isArray(d.ex)) return null;
-    return { date: d.date, di: wk(d.date), editId: (typeof d.editId === 'string' && d.editId) ? d.editId : '', base: (typeof d.base === 'string') ? d.base : null, ex: d.ex.filter(e => e && typeof e === 'object').map(e => ({ xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: num(e.smin), smax: num(e.smax), rmin: num(e.rmin), rmax: num(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] })) }
+    return { date: d.date, di: wk(d.date), editId: (typeof d.editId === 'string' && d.editId) ? d.editId : '', base: (typeof d.base === 'string') ? d.base : null, baseDate: isDate(d.baseDate) ? d.baseDate : ((typeof d.base === 'string') ? d.date : ''), ex: d.ex.filter(e => e && typeof e === 'object').map(e => ({ xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: num(e.smin), smax: num(e.smax), rmin: num(e.rmin), rmax: num(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] })) }
 }
 function backfillXids() {
     const byName = {};
@@ -160,7 +160,7 @@ function mk(e, date, skip) {
     const c = Math.max(1, +e.smin || 3);
     return { xid: e.id || '', n: e.n, m: e.m, smin: e.smin || '', smax: e.smax || '', rmin: e.rmin || '', rmax: e.rmax || '', on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
-function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); if (!saveD()) Store.notifyStorageFailure() }
+function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
 function fromLog(l) {
     const di = wk(l.date), pl = S.plan[di]?.ex || [];
     D = {
@@ -170,16 +170,19 @@ function fromLog(l) {
         })
     };
     D.base = JSON.stringify(D.ex); // baseline for draftHasData: the auto-loaded state is not "unsaved work"
+    D.baseDate = D.date;
     if (!saveD()) Store.notifyStorageFailure()
 }
 function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
 function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
 // "Dirty" = differs from the auto-generated baseline that newDraft/fromLog
-// snapshot into D.base, so auto-prefilled weights are not unsaved work.
-// Legacy drafts saved before base existed can't distinguish auto-fill from
-// typing: weight-only is ignored, reps/completed/skip still count.
+// snapshot into D.base/D.baseDate, so auto-prefilled weights and the initial
+// date are not unsaved work. Legacy drafts saved before base/baseDate existed
+// can't distinguish auto-fill from typing: weight-only is ignored,
+// reps/completed/skip/date changes recorded after the upgrade still count.
 function draftHasData(d) {
     if (!d) return false;
+    if (d.baseDate && d.date !== d.baseDate) return true;
     if (d.base != null) return JSON.stringify(d.ex) !== d.base;
     return d.ex.some(e => e.on === false || e.sets.some(s => s.d || +s.r > 0))
 }
