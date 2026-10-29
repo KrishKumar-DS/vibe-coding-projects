@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **182 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **192 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 2 | P1 | Exercise identity | “Add exercise” loses identity, prefills from the wrong date, and can duplicate Progress entries |
 | 3 | P1 | Data validation | Negative weights are accepted and saved |
 | 4 | P1 | Import integrity | Duplicate workout IDs are accepted |
 | 5 | P1 | Import integrity | Imported `di` can disagree with the workout date |
@@ -51,7 +50,7 @@
 
 ### Recommended patch order
 
-1. Items **2–3** — data loss, incorrect saved data, and wrong prefill.
+1. Item **3** — invalid weight data.
 2. Items **4–6** — import integrity and edit semantics.
 3. Items **7–11** — dead ends, invalid data, and escaping.
 4. Items **12–16** — quick UI/reliability improvements.
@@ -61,81 +60,6 @@
 ---
 
 # Priority 1 — Data loss or incorrect saved data
-
-## 2. “Add exercise” has three related identity and prefill bugs
-
-**Priority:** P1
-**Where:** `js/app.js:323-326`, `js/app.js:158-162` (`mk`), `js/app.js:147-157` (`lastSets`)
-
-### Problems
-
-1. **No stable identity.** `addx` calls `mk()` without an `id`, so the exercise gets `xid: ''`. Progression groups it by name. If the name matches a routine exercise, Progress can show two entries until a reload runs `backfillXids()`.
-2. **No prefill for known routine exercises.** If the custom name matches a routine exercise with a stable `id`, `canNameMatch()` returns false, so previous performance is not shown.
-3. **Prefill ignores the selected date.** `mk()` is called without `D.date`, so `lastSets()` searches every log, including workouts later than the date being edited.
-
-### Reproduction
-
-**Duplicate Progress entry**
-
-1. Have a saved “Bench Press” workout.
-2. Add “Bench Press” as an extra exercise in another workout.
-3. Complete and save it.
-4. Open Progress.
-
-Result: two entries such as “Bench Press · Chest” and “Bench Press (2)” until reload.
-
-**Prefill from a later date**
-
-1. Have “Cable Fly” logs on 2026-10-05 (`10kg`) and 2026-10-12 (`25kg`).
-2. Select 2026-09-28.
-3. Add “Cable Fly” as an extra exercise.
-
-Result: the draft is prefilled with `25kg` from a future-relative workout.
-
-### Fix
-
-Add a helper that resolves a unique routine exercise by name:
-
-```js
-function findUniquePlanExercise(name) {
-    const matches = [];
-    Object.values(S.plan).forEach(p => p.ex.forEach(e => {
-        if (e.n === name) matches.push(e);
-    }));
-    const ids = new Set(matches.map(e => e.id));
-    return ids.size === 1 ? matches[0] : null;
-}
-```
-
-Update `addx` to reuse the identity, muscle, and ranges, and pass the draft date:
-
-```js
-const n = $('#nx').value.trim();
-if (!n) return;
-
-const known = findUniquePlanExercise(n);
-const m = $('#nm').value.trim() || known?.m || allEx()[n] || 'Other';
-
-D.ex.push(mk({
-    id: known?.id,
-    n,
-    m,
-    smin: known?.smin ?? '',
-    smax: known?.smax ?? '',
-    rmin: known?.rmin ?? '',
-    rmax: known?.rmax ?? ''
-}, D.date));
-```
-
-### Acceptance
-
-- Adding an exercise that uniquely matches a routine exercise reuses its `xid`.
-- Previous performance is displayed and prefilled.
-- Prefill never comes from a workout on or after the selected date.
-- Saving does not create a temporary duplicate Progress entry.
-- Ambiguous names remain name-based and do not guess an identity.
-
----
 
 ## 3. Negative weights are accepted and saved
 
@@ -384,18 +308,21 @@ Use the same helper in the date input and Finish paths to avoid duplicated logic
 ## 8. Added exercises display a malformed target range
 
 **Priority:** P2
-**Where:** `js/app.js:199`, with `addx` at `js/app.js:325`
+**Where:** `js/app.js:208`, with `addx` at `js/app.js:332-345`
 
 ### Problem
 
-`addx` creates `smin: 3, rmin: '', rmax: ''`, and the label condition only checks `e.smin`. The UI displays:
+The target label is built only when `e.smin` is truthy, and it always renders both ranges. A partially configured exercise — for example sets set but reps blank, or an imported plan with `smin: 3` and no `rmin`/`rmax` — displays:
 
-> `3-3 sets × - reps`
+> `3- sets × - reps`
+
+`addx` now passes empty ranges for unknown exercises, so the original custom-exercise case shows “Extra exercise”, but the label builder still produces malformed output for partial ranges.
 
 ### Reproduction
 
-1. Add a custom exercise.
-2. Look at its target line.
+1. Set a routine exercise's sets min/max and leave its reps min/max blank (or restore a plan with partial ranges).
+2. Open Today for that routine day.
+3. Look at the exercise's target line.
 
 ### Fix
 
@@ -408,7 +335,7 @@ if (e.rmin) parts.push(`${e.rmin}-${e.rmax} reps`);
 const target = parts.length ? parts.join(' × ') : 'Extra exercise';
 ```
 
-Combined with item 2, pass empty ranges for unknown custom exercises so they show “Extra exercise.”
+`addx` now passes empty ranges for unknown custom exercises, so they show “Extra exercise.”
 
 ### Acceptance
 
@@ -755,32 +682,28 @@ Or use `Map` consistently.
 Add tests for:
 
 1. Restore with a dirty draft prompts and preserves the draft on cancel.
-2. Custom exercise identity:
-   - Known routine exercise reuses `xid`.
-   - Prefill is bounded by the selected date.
-   - Saving does not create a duplicate Progress entry.
-3. Negative weights are clamped.
-4. Duplicate log IDs are regenerated.
-5. Inconsistent `di` values are derived from the date.
-6. Editing a workout across weekdays preserves the original routine name.
-7. Weekday-chip date conflict while editing is blocked immediately.
-8. Draft and theme injection payloads remain escaped.
-9. Invalid theme values fall back to `system`.
-10. Routine validation rejects blank names and inverted ranges.
-11. Disabled future-day chips are rendered as disabled.
-12. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
-13. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-14. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-15. Restore and boot reject future-dated workouts.
-16. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-17. Imported duplicate dates do not make both records uneditable.
-18. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-19. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-20. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-21. A valid backup whose write fails reports a storage failure, not an invalid backup.
-22. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-23. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-24. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+2. Negative weights are clamped.
+3. Duplicate log IDs are regenerated.
+4. Inconsistent `di` values are derived from the date.
+5. Editing a workout across weekdays preserves the original routine name.
+6. Weekday-chip date conflict while editing is blocked immediately.
+7. Draft and theme injection payloads remain escaped.
+8. Invalid theme values fall back to `system`.
+9. Routine validation rejects blank names and inverted ranges.
+10. Disabled future-day chips are rendered as disabled.
+11. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+12. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
+13. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
+14. Restore and boot reject future-dated workouts.
+15. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
+16. Imported duplicate dates do not make both records uneditable.
+17. Deleting the currently edited workout with dirty changes warns before discarding the draft.
+18. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
+19. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
+20. A valid backup whose write fails reports a storage failure, not an invalid backup.
+21. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
+22. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
+23. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
 ### Acceptance
 
@@ -986,13 +909,13 @@ Result: the update is rejected until the date is changed.
 ## 24. “Add exercise” allows duplicates within one workout
 
 **Priority:** P2
-**Where:** `js/app.js:323-326` (`addx`), `js/app.js:214-216` (Add exercise fields)
+**Where:** `js/app.js:332-345` (`addx`), `js/app.js:223-226` (Add exercise fields)
 
 ### Problem
 
 `addx` does not check whether the draft already contains the exercise. Adding “Bench Press” to a workout that already has Bench Press creates a second card. On save, History shows both entries and training volume counts both.
 
-Until reload, the added entry also has `xid: ""`, which can produce a separate Progress group (related to item **2**). After item **2**'s identity fix, the identities may merge, but the duplicate rows and doubled volume remain.
+The added entry now reuses the routine identity, so Progress merges it with existing sessions; the duplicate rows and doubled volume remain.
 
 The name/muscle inputs are not cleared after adding, and any re-render (Skip, +Set, tab switch) wipes text that has not been added yet, making accidental duplicates easy.
 
@@ -1003,7 +926,7 @@ The name/muscle inputs are not cleared after adding, and any re-render (Skip, +S
 3. Complete a set in both cards and finish.
 4. Check History and Progress.
 
-Result: two Bench Press entries in History and doubled volume; Progress may show duplicates before reload.
+Result: two Bench Press entries in History and doubled volume.
 
 ### Fix
 
@@ -1117,7 +1040,7 @@ Two related label issues:
 ## 29. Editing a legacy ambiguous-name exercise assigns an arbitrary identity
 
 **Priority:** P3
-**Where:** `js/app.js:168` (`fromLog` name fallback)
+**Where:** `js/app.js:170` (`fromLog` name fallback)
 
 ### Problem
 
@@ -1133,7 +1056,7 @@ Result: the draft receives the first matching identity and the workout is assign
 
 ### Fix
 
-- Use a unique-name lookup (the helper proposed in item **2**).
+- Use `findUniquePlanExercise()` (the helper used by `addx`).
 - Assign an identity only when exactly one routine exercise matches the normalized name.
 - Otherwise leave `xid` blank so the exercise remains name-based.
 
@@ -1281,11 +1204,9 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `182 passed, 0 failed` plus new tests.
+- [ ] `node tests/run-tests.mjs` → `192 passed, 0 failed` plus new tests.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
-- [ ] Adding a known routine exercise prefills correctly and does not duplicate Progress.
-- [ ] Adding a custom exercise while logging a past date does not prefill from a later workout.
 - [ ] Negative weights are rejected or clamped.
 - [ ] Duplicate restored IDs are repaired.
 - [ ] `di` matches the date after restore.
