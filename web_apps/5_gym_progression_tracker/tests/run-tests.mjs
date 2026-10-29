@@ -730,6 +730,77 @@ section('Bug 3 — progression groups by stable identity (xid), not name');
 }
 
 // =====================================================================
+section('Bug 2 — add exercise reuses routine identity and bounded prefill');
+const addExercise = (c, name) => {
+  c.dom.set('#nx', makeEl({ id: 'nx', value: name }));
+  c.fireClick({ a: 'addx' });
+};
+const cableFlyPlan = () => ({
+  0: { name: 'Push', ex: [{ id: 'cf', n: 'Cable Fly', m: 'Chest', smin: 4, smax: 5, rmin: 10, rmax: 15 }] },
+  1: { name: '', ex: [] },
+});
+const cableFlyLogs = [
+  { id: 'l1', date: '2026-09-21', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'Cable Fly', m: 'Chest', xid: 'cf', sets: [{ w: 10, r: 12 }] }] },
+  { id: 'l2', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'Cable Fly', m: 'Chest', xid: 'cf', sets: [{ w: 25, r: 12 }] }] },
+  { id: 'l3', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'Cable Fly', m: 'Chest', xid: 'cf', sets: [{ w: 30, r: 12 }] }] },
+];
+{
+  // known routine exercise: reuse identity, muscle, and ranges, and prefill only
+  // from workouts before the draft date (Tue 29 Sep sees the 21 Sep session only)
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: cableFlyPlan(), logs: cableFlyLogs }) } });
+  c.fireChange({ id: 'dt', value: '2026-09-29' });
+  addExercise(c, 'Cable Fly');
+  const added = c.api.getD().ex.at(-1);
+  eq('known routine exercise reuses xid', added.xid, 'cf');
+  eq('known routine exercise reuses muscle', added.m, 'Chest');
+  eq('known routine exercise reuses ranges', [added.smin, added.smax, added.rmin, added.rmax], [4, 5, 10, 15]);
+  eq('prefill bounded by selected date (21 Sep, not 12 Oct)', String(added.sets[0].w), '10');
+}
+{
+  // the added exercise saves with the routine identity, so Progress stays merged
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: cableFlyPlan(), logs: cableFlyLogs }) } });
+  addExercise(c, 'Cable Fly');
+  const i = String(c.api.getD().ex.length - 1);
+  c.fireInput({ dataset: { f: 'r', i, j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i, j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  const rec = c.api.getS().logs.find(l => l.date === '2026-10-13');
+  ok('added exercise saved', !!rec && rec.ex.length === 1);
+  eq('saved added exercise keeps routine xid', rec.ex[0].xid, 'cf');
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('no temporary duplicate Progress entry', opts.filter(o => o[2].startsWith('Cable Fly')).length, 1);
+}
+{
+  // name-based exercise (not in the routine): stays identity-free but still
+  // must not prefill from a workout on or after the selected date
+  const plan = { 0: { name: '', ex: [] }, 1: { name: '', ex: [] } };
+  const logs = [
+    { id: 'h1', date: '2026-09-21', day: 'Monday', year: 2026, di: 0, name: '', ex: [{ n: 'Face Pull', m: 'Rear Delts', xid: '', sets: [{ w: 10, r: 15 }] }] },
+    { id: 'h2', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: '', ex: [{ n: 'Face Pull', m: 'Rear Delts', xid: '', sets: [{ w: 30, r: 15 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireChange({ id: 'dt', value: '2026-09-29' });
+  addExercise(c, 'Face Pull');
+  const added = c.api.getD().ex.at(-1);
+  eq('name-based exercise stays identity-free', added.xid, '');
+  eq('name-based prefill bounded by selected date (21 Sep, not 12 Oct)', String(added.sets[0].w), '10');
+}
+{
+  // ambiguous routine names must never be guessed
+  const plan = {
+    0: { name: 'Push', ex: [
+      { id: 'bp1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+      { id: 'bp2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    ] },
+    1: { name: '', ex: [] },
+  };
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [] }) } });
+  addExercise(c, 'Bench Press');
+  eq('ambiguous routine name stays name-based', c.api.getD().ex.at(-1).xid, '');
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

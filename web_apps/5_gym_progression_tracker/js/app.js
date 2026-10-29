@@ -144,6 +144,12 @@ function canNameMatch(name) {
     S.logs.forEach(l => l.ex.forEach(e => { if (e.n === name) ids.add(e.xid || '') }));
     return ids.size === 0 || (ids.size === 1 && ids.has(''))
 }
+function findUniquePlanExercise(name) {
+    const matches = [];
+    Object.values(S.plan).forEach(p => p.ex.forEach(e => { if (e.n === name) matches.push(e) }));
+    const ids = new Set(matches.map(e => e.id));
+    return ids.size === 1 ? matches[0] : null
+}
 function lastSets(e, date, skip) {
     for (let i = S.logs.length - 1; i >= 0; i--) {
         const L = S.logs[i];
@@ -324,8 +330,19 @@ document.addEventListener('click', async ev => {
     else if (a === 'de') { D.ex.splice(i, 1); if (!saveD()) Store.notifyStorageFailure() }
     else if (a === 'cp') { const w = D.ex[i].sets[0]?.w; D.ex[i].sets.forEach(s => s.w = w); if (!saveD()) Store.notifyStorageFailure() }
     else if (a === 'addx') {
-        const n = $('#nx').value.trim(), m = $('#nm').value.trim() || allEx()[n] || 'Other'; if (!n) return;
-        D.ex.push(mk({ n, m, smin: 3, smax: 3, rmin: '', rmax: '' })); if (!saveD()) Store.notifyStorageFailure()
+        const n = $('#nx').value.trim(); if (!n) return;
+        const known = findUniquePlanExercise(n);
+        const m = $('#nm').value.trim() || known?.m || allEx()[n] || 'Other';
+        D.ex.push(mk({
+            id: known?.id,
+            n,
+            m,
+            smin: known?.smin ?? '',
+            smax: known?.smax ?? '',
+            rmin: known?.rmin ?? '',
+            rmax: known?.rmax ?? ''
+        }, D.date));
+        if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
         const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: +s.w || 0, r: +s.r })) })).filter(e => e.sets.length);
