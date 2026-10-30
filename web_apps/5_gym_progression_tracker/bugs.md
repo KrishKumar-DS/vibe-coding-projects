@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27
+**Date:** 2026-10-27 (last updated 2026-10-30)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **192 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **200 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 3 | P1 | Data validation | Negative weights are accepted and saved |
 | 4 | P1 | Import integrity | Duplicate workout IDs are accepted |
 | 5 | P1 | Import integrity | Imported `di` can disagree with the workout date |
 | 6 | P1 | Editing | Moving an edited workout across weekdays changes its name but not its exercises |
@@ -50,64 +49,15 @@
 
 ### Recommended patch order
 
-1. Item **3** — invalid weight data.
-2. Items **4–6** — import integrity and edit semantics.
-3. Items **7–11** — dead ends, invalid data, and escaping.
-4. Items **12–16** — quick UI/reliability improvements.
-5. Items **17–18** — documentation and regression coverage.
-6. Follow-up items **19–20, 21–24, 26–33** — treat 19–20 as P1 and schedule them with the first data-integrity pass, then work down the remaining follow-up priorities.
+1. Items **4–6** — import integrity and edit semantics.
+2. Items **7–11** — dead ends, invalid data, and escaping.
+3. Items **12–16** — quick UI/reliability improvements.
+4. Items **17–18** — documentation and regression coverage.
+5. Follow-up items **19–20, 21–24, 26–33** — treat 19–20 as P1 and schedule them with the first data-integrity pass, then work down the remaining follow-up priorities.
 
 ---
 
 # Priority 1 — Data loss or incorrect saved data
-
-## 3. Negative weights are accepted and saved
-
-**Priority:** P1
-**Where:** `js/app.js:204`, `js/app.js:328`
-
-### Problem
-
-The save mapping uses `w: +s.w || 0`, which preserves negative values. Entering `-50` for weight and finishing saves `-50`.
-
-### Reproduction
-
-1. Enter `-50` in a weight field.
-2. Enter reps and tick the set.
-3. Finish the workout.
-
-Result: the saved set has `w: -50`.
-
-### Fix
-
-Add input constraints in the Today view template:
-
-```html
-<input type="number" inputmode="decimal" min="0" step="any" ...>
-```
-
-Add reps constraints:
-
-```html
-<input type="number" inputmode="numeric" min="1" step="1" ...>
-```
-
-Clamp weight when saving:
-
-```js
-w: Math.max(0, +s.w || 0)
-```
-
-A weight of `0` remains valid for bodyweight exercises.
-
-### Acceptance
-
-- Negative weights cannot be saved.
-- Decimal weights such as `62.5` behave consistently.
-- Zero weight remains valid.
-- Reps must be at least one to count as completed.
-
----
 
 ## 4. Duplicate workout IDs are accepted
 
@@ -682,28 +632,27 @@ Or use `Map` consistently.
 Add tests for:
 
 1. Restore with a dirty draft prompts and preserves the draft on cancel.
-2. Negative weights are clamped.
-3. Duplicate log IDs are regenerated.
-4. Inconsistent `di` values are derived from the date.
-5. Editing a workout across weekdays preserves the original routine name.
-6. Weekday-chip date conflict while editing is blocked immediately.
-7. Draft and theme injection payloads remain escaped.
-8. Invalid theme values fall back to `system`.
-9. Routine validation rejects blank names and inverted ranges.
-10. Disabled future-day chips are rendered as disabled.
-11. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
-12. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-13. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-14. Restore and boot reject future-dated workouts.
-15. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-16. Imported duplicate dates do not make both records uneditable.
-17. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-18. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-19. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-20. A valid backup whose write fails reports a storage failure, not an invalid backup.
-21. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-22. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-23. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+2. Duplicate log IDs are regenerated.
+3. Inconsistent `di` values are derived from the date.
+4. Editing a workout across weekdays preserves the original routine name.
+5. Weekday-chip date conflict while editing is blocked immediately.
+6. Draft and theme injection payloads remain escaped.
+7. Invalid theme values fall back to `system`.
+8. Routine validation rejects blank names and inverted ranges.
+9. Disabled future-day chips are rendered as disabled.
+10. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+11. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
+12. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
+13. Restore and boot reject future-dated workouts.
+14. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
+15. Imported duplicate dates do not make both records uneditable.
+16. Deleting the currently edited workout with dirty changes warns before discarding the draft.
+17. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
+18. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
+19. A valid backup whose write fails reports a storage failure, not an invalid backup.
+20. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
+21. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
+22. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
 ### Acceptance
 
@@ -1204,10 +1153,9 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `192 passed, 0 failed` plus new tests.
+- [ ] `node tests/run-tests.mjs` → `200 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
-- [ ] Negative weights are rejected or clamped.
 - [ ] Duplicate restored IDs are repaired.
 - [ ] `di` matches the date after restore.
 - [ ] Moving an edited workout to another weekday keeps a consistent name and exercise list.
