@@ -210,8 +210,8 @@ function today_v() {
         if (e.on) {
             e.sets.forEach((s, j) => {
                 h += `<div class="row"><span class="n">${j + 1}</span>
-   <input type="number" inputmode="decimal" placeholder="kg" value="${s.w}" data-f="w" data-i="${i}" data-j="${j}">
-   <input type="number" inputmode="numeric" placeholder="${e.rmin ? e.rmin + '-' + e.rmax : 'reps'}" value="${s.r}" data-f="r" data-i="${i}" data-j="${j}">
+   <input type="number" inputmode="decimal" min="0" step="any" placeholder="kg" value="${s.w}" data-f="w" data-i="${i}" data-j="${j}">
+   <input type="number" inputmode="numeric" min="1" step="1" placeholder="${e.rmin ? e.rmin + '-' + e.rmax : 'reps'}" value="${s.r}" data-f="r" data-i="${i}" data-j="${j}">
    <input type="checkbox" class="ok" ${s.d ? 'checked' : ''} data-f="d" data-i="${i}" data-j="${j}">
    <button class="x" data-a="ds" data-i="${i}" data-j="${j}">✕</button></div>`
             });
@@ -345,7 +345,7 @@ document.addEventListener('click', async ev => {
         if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
-        const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: +s.w || 0, r: +s.r })) })).filter(e => e.sets.length);
+        const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: Math.max(0, +s.w || 0), r: Math.max(1, Math.floor(+s.r) || 1) })) })).filter(e => e.sets.length);
         if (!ex.length) { alert('Mark at least one set as completed and enter its repetitions.'); return }
         const date = D.date;
         if (!isDate(date) || date > today()) { alert('Please choose a valid date that is not in the future.'); return }

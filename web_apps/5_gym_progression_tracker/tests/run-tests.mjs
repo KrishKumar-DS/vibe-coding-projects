@@ -801,6 +801,52 @@ const cableFlyLogs = [
 }
 
 // =====================================================================
+section('Bug 3 — negative weights are clamped; zero and decimals stay valid');
+
+// Finish the first set of today's first exercise with the given weight/reps.
+const finishSet = (weight, reps, done = true) => {
+  const c = app({});
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: weight });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: reps });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: done });
+  c.fireClick({ a: 'fin' });
+  return c;
+};
+
+{
+  const c = app({});
+  const html = c.dom.get('#v').innerHTML;
+  ok('weight input enforces min 0 and decimal steps', html.includes('inputmode="decimal" min="0" step="any"'));
+  ok('reps input enforces min 1 integer steps', html.includes('inputmode="numeric" min="1" step="1"'));
+}
+{
+  const c = finishSet('-50', '8');
+  const saved = c.api.getS().logs[0].ex[0].sets[0];
+  eq('negative weight is clamped to 0 on save', saved.w, 0);
+}
+{
+  const c = finishSet('62.5', '8');
+  const saved = c.api.getS().logs[0].ex[0].sets[0];
+  eq('decimal weight is preserved', saved.w, 62.5);
+}
+{
+  const c = finishSet('0', '8');
+  const saved = c.api.getS().logs[0].ex[0].sets[0];
+  ok('zero weight remains valid', saved.w === 0 && saved.r === 8);
+}
+{
+  // isCompleted already requires reps > 0, so a negative-rep set must not save
+  const c = finishSet('50', '-5');
+  eq('negative reps do not count as completed', c.api.getS().logs.length, 0);
+  ok('negative reps produce the expected message', c.alerts.some(a => a.includes('at least one set')));
+}
+{
+  const c = finishSet('50', '8.9');
+  const saved = c.api.getS().logs[0].ex[0].sets[0];
+  eq('decimal reps are stored as integers', saved.r, 8);
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
