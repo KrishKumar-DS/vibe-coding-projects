@@ -5,6 +5,12 @@ const pad = n => String(n).padStart(2, '0');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const safeId = v => (typeof v === 'string' && /^[A-Za-z0-9_-]+$/.test(v)) ? v : uid();
+function freshId(used) {
+    let id;
+    do { id = uid() } while (used.has(id));
+    used.add(id);
+    return id
+}
 const themeLabel = t => ({ light: 'Light', dark: 'Dark', system: 'System' }[t] || t);
 
 
@@ -64,8 +70,52 @@ function normLog(l) {
     if (!l || typeof l !== 'object' || !isDate(l.date)) return null;
     return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: (Number.isInteger(l.di) && l.di >= 0 && l.di < 7) ? l.di : wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
 }
+function dedupeLogIds(logs) {
+    const used = new Set(logs.map(l => l.id));
+    const seen = new Set();
+    logs.forEach(l => {
+        if (seen.has(l.id)) l.id = freshId(used);
+        seen.add(l.id)
+    })
+}
+function dedupePlanIds(plan) {
+    const groups = new Map();
+    Object.values(plan).forEach(p => p.ex.forEach(e => {
+        if (!groups.has(e.id)) groups.set(e.id, []);
+        groups.get(e.id).push(e)
+    }));
+    const used = new Set(groups.keys());
+    const remap = new Map();
+    groups.forEach((exs, oldId) => {
+        if (exs.length < 2) return;
+        const entries = [{ id: oldId, n: exs[0].n, m: exs[0].m }];
+        exs.slice(1).forEach(e => {
+            const id = freshId(used);
+            e.id = id;
+            entries.push({ id, n: e.n, m: e.m })
+        });
+        remap.set(oldId, entries)
+    });
+    return remap
+}
+function reconcileLogXids(logs, remap) {
+    if (!remap.size) return;
+    logs.forEach(l => l.ex.forEach(e => {
+        const candidates = remap.get(e.xid);
+        if (!candidates) return;
+        const byName = candidates.filter(c => c.n === e.n);
+        let matches = e.m ? byName.filter(c => c.m === e.m) : byName;
+        if (matches.length !== 1) matches = byName;
+        e.xid = matches.length === 1 ? matches[0].id : ''
+    }))
+}
 function normalizeData(o) {
-    return { plan: normPlan(o && o.plan), logs: (o && Array.isArray(o.logs) ? o.logs : []).map(normLog).filter(Boolean).sort(byDate) }
+    const plan = normPlan(o && o.plan);
+    const logs = (o && Array.isArray(o.logs) ? o.logs : []).map(normLog).filter(Boolean).sort(byDate);
+    dedupeLogIds(logs);
+    const remap = dedupePlanIds(plan);
+    reconcileLogXids(logs, remap);
+    return { plan, logs }
 }
 function normDraft(d) {
     if (!d || typeof d !== 'object' || !isDate(d.date) || !Array.isArray(d.ex)) return null;
@@ -121,6 +171,7 @@ const boot = bootState();
 S = boot.S;
 D = normDraft(Store.loadDraft());
 backfillXids();
+repairDraftEditId();
 if (boot.persist) save();
 
 // Theme persistence (light / dark / system). Applies before first render.
@@ -195,6 +246,15 @@ function draftHasData(d) {
 function mayDiscard() {
     if (!draftHasData(D)) return true;
     return confirm('Unsaved changes on this screen will be lost. Continue?')
+}
+function repairDraftEditId() {
+    if (!D || !D.editId) return;
+    const anchor = D.baseDate || D.date;
+    const linked = S.logs.find(l => l.id === D.editId);
+    if (linked && linked.date === anchor) return;
+    const sameDate = S.logs.filter(l => l.date === anchor);
+    D.editId = sameDate.length === 1 ? sameDate[0].id : '';
+    if (!saveD()) Store.notifyStorageFailure()
 }
 
 function today_v() {

@@ -847,6 +847,140 @@ const finishSet = (weight, reps, done = true) => {
 }
 
 // =====================================================================
+section('Bug 4 — duplicate workout and exercise IDs are repaired');
+
+const duplicateLogs = () => [
+  { id: 'dup', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Monday', ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }] },
+  { id: 'dup', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'Tuesday', ex: [{ n: 'Lat Pulldown', m: 'Back', xid: '', sets: [{ w: 40, r: 10 }] }] },
+];
+const duplicateData = () => ({ plan: JSON.parse(DEFAULTS).plan, logs: duplicateLogs() });
+
+{
+  const c = app({ seed: { gym_data: JSON.stringify(duplicateData()) } });
+  const logs = c.api.getS().logs;
+  eq('duplicate workout IDs are repaired on boot', new Set(logs.map(l => l.id)).size, 2);
+  eq('both duplicate workouts are kept', logs.length, 2);
+  eq('the oldest duplicate keeps its ID', logs[0].id, 'dup');
+  ok('the newer duplicate gets a new ID', logs[1].id !== 'dup');
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.ctl.prompt = JSON.stringify(duplicateData());
+  c.fireClick({ a: 'rs' });
+  const logs = c.api.getS().logs;
+  eq('duplicate workout IDs are repaired on restore', new Set(logs.map(l => l.id)).size, 2);
+  ok('restore still reports success', c.alerts.some(a => a.includes('Backup restored')));
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify(duplicateData()) } });
+  const [first, second] = c.api.getS().logs;
+  c.fireClick({ a: 'edit', id: second.id });
+  eq('Edit opens the clicked duplicate workout', c.api.getD().date, second.date);
+  eq('Edit loads the clicked workout exercises', c.api.getD().ex[0].n, second.ex[0].n);
+  c.fireClick({ a: 'edit', id: first.id });
+  eq('Edit can open the other duplicate workout too', c.api.getD().date, first.date);
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify(duplicateData()) } });
+  const [first, second] = c.api.getS().logs;
+  c.fireClick({ a: 'dl', id: second.id });
+  eq('Delete removes only the selected duplicate', c.api.getS().logs.map(l => l.id), [first.id]);
+  eq('the other duplicate workout is unchanged', c.api.getS().logs[0].date, first.date);
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify(duplicateData()) } });
+  const [first, second] = c.api.getS().logs;
+  c.fireClick({ a: 'edit', id: second.id });
+  c.fireClick({ a: 'fin' });
+  const logs = c.api.getS().logs;
+  eq('finishing one duplicate keeps both workouts', logs.length, 2);
+  eq('finishing one duplicate leaves the other unchanged', logs.find(l => l.id === first.id).date, first.date);
+}
+{
+  const logs = [
+    { id: 'a', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'A', ex: [{ n: 'Squat', m: 'Legs', xid: '', sets: [{ w: 80, r: 5 }] }] },
+    { id: 'b', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'B', ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs }) } });
+  eq('unique workout IDs are left unchanged', c.api.getS().logs.map(l => l.id), ['a', 'b']);
+}
+
+const duplicatePlan = () => {
+  const plan = JSON.parse(DEFAULTS).plan;
+  plan[0] = { name: 'Push', ex: [
+    { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'pid', n: 'Incline DB Press', m: 'Chest', smin: 3, smax: 3, rmin: 8, rmax: 12 },
+  ] };
+  return plan;
+};
+const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles = ['Chest', 'Chest']) => [{
+  id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [
+    { n: names[0], m: muscles[0], xid: 'pid', sets: [{ w: 60, r: 8 }] },
+    { n: names[1], m: muscles[1], xid: 'pid', sets: [{ w: 24, r: 10 }] },
+  ],
+}];
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: duplicatePlan(), logs: duplicatePlanLogs() }) } });
+  const exs = c.api.getS().plan[0].ex;
+  eq('duplicate routine exercise IDs are made unique', new Set(exs.map(e => e.id)).size, 2);
+  const bench = exs.find(e => e.n === 'Bench Press');
+  const incline = exs.find(e => e.n === 'Incline DB Press');
+  const log = c.api.getS().logs[0];
+  eq('history keeps the matching Bench Press identity', log.ex.find(e => e.n === 'Bench Press').xid, bench.id);
+  eq('history keeps the matching Incline identity', log.ex.find(e => e.n === 'Incline DB Press').xid, incline.id);
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('unrelated exercises stay separate in Progress', opts.length, 2);
+}
+{
+  const plan = duplicatePlan();
+  plan[0].ex = [
+    { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'pid', n: 'Bench Press', m: 'Back', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const logs = duplicatePlanLogs(['Bench Press', 'Bench Press'], ['Back', 'Back']);
+  logs[0].ex = [logs[0].ex[0]];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  const back = c.api.getS().plan[0].ex.find(e => e.m === 'Back');
+  eq('history follows a unique name and muscle match', c.api.getS().logs[0].ex[0].xid, back.id);
+}
+{
+  const plan = duplicatePlan();
+  plan[0].ex = [
+    { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const logs = duplicatePlanLogs(['Bench Press', 'Bench Press'], ['Chest', 'Chest']);
+  logs[0].ex = [logs[0].ex[0]];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('ambiguous history is not assigned to an arbitrary ID', c.api.getS().logs[0].ex[0].xid, '');
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const before = Object.values(plan).flatMap(p => p.ex.map(e => e.id));
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [] }) } });
+  const after = Object.values(c.api.getS().plan).flatMap(p => p.ex.map(e => e.id));
+  eq('unique routine exercise IDs are left unchanged', after, before);
+}
+{
+  const draft = { date: '2026-10-06', di: 1, editId: 'dup', ex: [] };
+  const c = app({ seed: {
+    gym_data: JSON.stringify(duplicateData()),
+    gym_draft: JSON.stringify(draft),
+  } });
+  const second = c.api.getS().logs.find(l => l.date === '2026-10-06');
+  eq('a draft is relinked to the repaired workout', c.api.getD().editId, second.id);
+}
+{
+  const draft = { date: '2026-10-07', di: 2, editId: 'ghost', ex: [] };
+  const c = app({ seed: {
+    gym_data: DEFAULTS,
+    gym_draft: JSON.stringify(draft),
+  } });
+  eq('a draft with a missing workout is cleared', c.api.getD().editId, '');
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
