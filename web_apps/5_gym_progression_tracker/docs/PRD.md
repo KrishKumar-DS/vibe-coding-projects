@@ -565,7 +565,7 @@ The application shall:
 
 If saving the restored state fails, the previous in-memory state is restored and an error is shown.
 
-The current validator does not reject duplicate workout IDs, duplicate workout dates, or a valid but internally inconsistent `di` value. See Known Limitations.
+The validator accepts duplicate workout IDs, but normalization replaces them with unique IDs. It does not reject duplicate workout dates or a valid but internally inconsistent `di` value; those remain Known Limitations.
 
 ---
 
@@ -821,6 +821,8 @@ The theme is stored separately from `S` and `D`.
 - A logged exercise stores that identity as `xid`.
 - Progression groups by `xid` first, then by name for legacy records.
 - On load and restore, legacy logs without `xid` are backfilled only when an exercise name maps to exactly one routine identity across the entire plan.
+- Duplicate routine exercise IDs are replaced during normalization; the first exercise with that ID keeps it.
+- Logs that used a duplicated `xid` are moved to the matching routine exercise only when name and muscle identify exactly one match; otherwise the exercise stays name-based.
 - Ambiguous names remain name-based.
 - Custom exercises added during a workout currently receive an empty `xid`.
 
@@ -837,7 +839,8 @@ When loading or restoring data, the application:
 - Recomputes `day` and `year` from the date.
 - Preserves a valid integer `di` from stored data; otherwise derives it from the date.
 - Keeps only sets with positive repetitions in saved logs.
-- Generates replacement log IDs when a stored ID is missing or has an invalid format.
+- Generates replacement log IDs when a stored ID is missing, has an invalid format, or duplicates another workout.
+- Generates replacement routine exercise IDs when an imported plan repeats an ID.
 - Sorts logs ascending by date.
 - Drops unknown top-level fields.
 
@@ -1038,14 +1041,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, backup validation, checked-set saving, edit identity and conflicts, dirty-draft detection, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
+- Covers malformed storage, backup validation, checked-set saving, edit identity and conflicts, duplicate ID repair, dirty-draft detection, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-151 passed, 0 failed
+223 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1077,8 +1080,9 @@ The application should:
 13. Warn the user when storage writes fail.
 14. Protect unsaved drafts when changing the date or weekday.
 15. Reject future dates and invalid date strings.
+16. Give every loaded or restored workout and routine exercise a unique ID.
 
-Current exceptions to escaping and duplicate handling are listed in Known Limitations.
+Current exceptions to escaping and duplicate-date handling are listed in Known Limitations.
 
 ---
 
@@ -1226,8 +1230,8 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Theme and the current draft are excluded from backups.
 - Backup is clipboard/prompt based; there is no file download or file upload.
 - Restore replaces all current data; it does not merge.
-- Restore does not reject duplicate workout IDs.
-- With duplicate IDs, Edit opens the first matching workout and Delete removes all matching records.
+- Restore accepts duplicate workout IDs but normalization gives each record a unique ID.
+- Restore accepts duplicate routine exercise IDs but normalization gives each exercise a unique ID and repairs history that clearly matches one exercise.
 - Restore accepts valid but internally inconsistent `di` values.
 - Restore accepts duplicate workout dates.
 - Unknown fields in a backup are dropped during normalization.
@@ -1291,7 +1295,7 @@ Short-term improvements that align the implementation more closely with this doc
 - Preserve or deliberately update the workout name when an edited date crosses weekdays.
 - Apply the date-conflict check to weekday chips during editing.
 - Escape draft set values and the theme label.
-- Reject or repair duplicate workout IDs, duplicate dates, and inconsistent `di` values on restore.
+- Reject or repair duplicate dates and inconsistent `di` values on restore.
 - Add a schema version and migration path.
 - Improve recovery-copy reporting and cleanup.
 - Add multi-tab conflict detection.
