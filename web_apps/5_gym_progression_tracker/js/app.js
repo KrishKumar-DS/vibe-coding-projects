@@ -68,7 +68,7 @@ function normLogEx(e) {
 }
 function normLog(l) {
     if (!l || typeof l !== 'object' || !isDate(l.date)) return null;
-    return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: (Number.isInteger(l.di) && l.di >= 0 && l.di < 7) ? l.di : wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
+    return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
 }
 function dedupeLogIds(logs) {
     const used = new Set(logs.map(l => l.id));

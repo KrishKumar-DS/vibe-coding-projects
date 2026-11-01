@@ -192,6 +192,36 @@ section('Bugs 2 & 3 — backup validation + normalization on restore');
 }
 
 // =====================================================================
+section('Import integrity — di is always derived from the workout date');
+const weekdayIndex = s => (new Date(s + 'T00:00:00').getDay() + 6) % 7;
+const inconsistentLog = di => ({
+  id: 'di1', date: '2026-10-05', day: 'Thursday', year: 1999, di, name: 'A',
+  ex: [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }],
+});
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [inconsistentLog(3)] }) } });
+  const l = c.api.getS().logs[0];
+  eq('boot derives di from date', l.di, weekdayIndex('2026-10-05'));
+  eq('boot derives day from date', l.day, 'Monday');
+  eq('boot derives year from date', l.year, 2026);
+  eq('boot persists corrected di', JSON.parse(c.store.get('gym_data')).logs[0].di, 0);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.ctl.prompt = JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [inconsistentLog(3)] });
+  c.fireClick({ a: 'rs' });
+  ok('restore accepts the backup', c.alerts.some(a => a.includes('Backup restored')));
+  eq('restore derives di from date', c.api.getS().logs[0].di, weekdayIndex('2026-10-05'));
+  eq('restore persists corrected di', JSON.parse(c.store.get('gym_data')).logs[0].di, 0);
+}
+for (const di of [7, -1, '3', 1.5, null]) {
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [inconsistentLog(di)] }) } });
+  const l = c.api.getS().logs[0];
+  eq('invalid di ' + JSON.stringify(di) + ' -> derived', l.di, weekdayIndex('2026-10-05'));
+  ok('invalid di ' + JSON.stringify(di) + ' -> day/year consistent', l.day === 'Monday' && l.year === 2026);
+}
+
+// =====================================================================
 section('Bug 4 — only checked sets with reps are saved');
 {
   const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
