@@ -500,7 +500,7 @@ Behavior:
 - Data is loaded and normalized on boot.
 - Invalid exercises and logs are dropped or repaired during normalization.
 - The plan is normalized to seven days.
-- Log workout days, years, and weekday indexes are derived from dates, except that an existing valid `di` value is preserved.
+- Log workout days, years, and weekday indexes are derived from dates.
 - Logs are sorted by date ascending internally.
 - The normalized plan and logs are saved back after normalization when a stored JSON object was present; absent or unparseable data is not immediately overwritten.
 - If storage writes fail, the user is warned once until a subsequent successful write.
@@ -565,7 +565,7 @@ The application shall:
 
 If saving the restored state fails, the previous in-memory state is restored and an error is shown.
 
-The validator accepts duplicate workout IDs, but normalization replaces them with unique IDs. It does not reject duplicate workout dates or a valid but internally inconsistent `di` value; those remain Known Limitations.
+The validator accepts duplicate workout IDs, but normalization replaces them with unique IDs. It does not reject duplicate workout dates, which remains a Known Limitation. An inconsistent `di` value is repaired from the workout date during normalization.
 
 ---
 
@@ -837,7 +837,7 @@ When loading or restoring data, the application:
 - Drops non-object plan exercises and exercises that have neither `n` nor `name`; non-string names become empty strings.
 - Drops logs without valid dates.
 - Recomputes `day` and `year` from the date.
-- Preserves a valid integer `di` from stored data; otherwise derives it from the date.
+- Derives the weekday index `di` from the date.
 - Keeps only sets with positive repetitions in saved logs.
 - Generates replacement log IDs when a stored ID is missing, has an invalid format, or duplicates another workout.
 - Generates replacement routine exercise IDs when an imported plan repeats an ID.
@@ -1232,7 +1232,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Restore replaces all current data; it does not merge.
 - Restore accepts duplicate workout IDs but normalization gives each record a unique ID.
 - Restore accepts duplicate routine exercise IDs but normalization gives each exercise a unique ID and repairs history that clearly matches one exercise.
-- Restore accepts valid but internally inconsistent `di` values.
+- Restore repairs an inconsistent `di` value from the workout date.
 - Restore accepts duplicate workout dates.
 - Unknown fields in a backup are dropped during normalization.
 - There is no backup schema version.
@@ -1295,7 +1295,7 @@ Short-term improvements that align the implementation more closely with this doc
 - Preserve or deliberately update the workout name when an edited date crosses weekdays.
 - Apply the date-conflict check to weekday chips during editing.
 - Escape draft set values and the theme label.
-- Reject or repair duplicate dates and inconsistent `di` values on restore.
+- Reject or repair duplicate dates on restore.
 - Add a schema version and migration path.
 - Improve recovery-copy reporting and cleanup.
 - Add multi-tab conflict detection.

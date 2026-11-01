@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-10-31)
+**Date:** 2026-10-27 (last updated 2026-11-01)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **223 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **240 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 5 | P1 | Import integrity | Imported `di` can disagree with the workout date |
 | 6 | P1 | Editing | Moving an edited workout across weekdays changes its name but not its exercises |
 | 7 | P2 | Editing | Weekday chips bypass the edit-date conflict check |
 | 8 | P2 | UI | Added exercises display a malformed target range |
@@ -48,7 +47,7 @@
 
 ### Recommended patch order
 
-1. Items **5–6** — import integrity and edit semantics.
+1. Item **6** — edit semantics.
 2. Items **7–11** — dead ends, invalid data, and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Items **17–18** — documentation and regression coverage.
@@ -57,44 +56,6 @@
 ---
 
 # Priority 1 — Data loss or incorrect saved data
-
-## 5. Imported `di` can disagree with the workout date
-
-**Priority:** P1
-**Where:** `js/app.js:65`
-
-### Problem
-
-`normLog()` preserves any valid integer `di` from `0–6`, even if it does not match `l.date`. The `day` and `year` fields are always derived, so the record becomes internally inconsistent.
-
-### Reproduction
-
-Restore a backup with:
-
-```json
-{
-  "date": "2026-10-05",
-  "di": 3
-}
-```
-
-2026-10-05 is a Monday, but the saved `di` becomes `3` (Thursday).
-
-### Fix
-
-Always derive the weekday index:
-
-```js
-di: wk(l.date)
-```
-
-### Acceptance
-
-- `di` always matches the weekday of the date.
-- `day` and `year` also remain derived.
-- Backups with inconsistent `di` values are normalized on load and restore.
-
----
 
 ## 6. Editing a workout across weekdays changes the routine name but not the exercises
 
@@ -578,26 +539,25 @@ Or use `Map` consistently.
 Add tests for:
 
 1. Restore with a dirty draft prompts and preserves the draft on cancel.
-2. Inconsistent `di` values are derived from the date.
-3. Editing a workout across weekdays preserves the original routine name.
-4. Weekday-chip date conflict while editing is blocked immediately.
-5. Draft and theme injection payloads remain escaped.
-6. Invalid theme values fall back to `system`.
-7. Routine validation rejects blank names and inverted ranges.
-8. Disabled future-day chips are rendered as disabled.
-9. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
-10. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-11. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-12. Restore and boot reject future-dated workouts.
-13. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-14. Imported duplicate dates do not make both records uneditable.
-15. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-16. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-17. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-18. A valid backup whose write fails reports a storage failure, not an invalid backup.
-19. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-20. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-21. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+2. Editing a workout across weekdays preserves the original routine name.
+3. Weekday-chip date conflict while editing is blocked immediately.
+4. Draft and theme injection payloads remain escaped.
+5. Invalid theme values fall back to `system`.
+6. Routine validation rejects blank names and inverted ranges.
+7. Disabled future-day chips are rendered as disabled.
+8. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+9. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
+10. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
+11. Restore and boot reject future-dated workouts.
+12. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
+13. Imported duplicate dates do not make both records uneditable.
+14. Deleting the currently edited workout with dirty changes warns before discarding the draft.
+15. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
+16. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
+17. A valid backup whose write fails reports a storage failure, not an invalid backup.
+18. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
+19. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
+20. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
 ### Acceptance
 
@@ -1098,10 +1058,9 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `223 passed, 0 failed`.
+- [ ] `node tests/run-tests.mjs` → `240 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
-- [ ] `di` matches the date after restore.
 - [ ] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [ ] Weekday chips block occupied dates immediately while editing.
 - [ ] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
