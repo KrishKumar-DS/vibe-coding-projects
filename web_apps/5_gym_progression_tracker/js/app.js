@@ -231,6 +231,12 @@ function fromLog(l) {
     if (!saveD()) Store.notifyStorageFailure()
 }
 function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
+// A saved workout keeps the name it was created with, even if it is later
+// moved to another weekday. New drafts use the selected weekday's routine name.
+function draftName() {
+    const existing = D && D.editId ? S.logs.find(l => l.id === D.editId) : null;
+    return existing ? (existing.name || '') : ((S.plan[D.di] || {}).name || '')
+}
 function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
 // "Dirty" = differs from the auto-generated baseline that newDraft/fromLog
 // snapshot into D.base/D.baseDate, so auto-prefilled weights and the initial
@@ -259,9 +265,8 @@ function repairDraftEditId() {
 
 function today_v() {
     if (!D) openDate(today());
-    const p = S.plan[D.di] || { name: '', ex: [] };
     let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="mu" style="margin-top:6px">✏️ Editing a saved workout. Changes update it.</div>' : ''}</div><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}"${dateForWeekday(i, D.date) > today() ? ' disabled' : ''}>${d}</button>`).join('')}</div>
- <div class="mu" style="margin-bottom:8px">${esc(p.name || 'No routine set')}</div>`;
+ <div class="mu" style="margin-bottom:8px">${esc(draftName() || 'No routine set')}</div>`;
     D.ex.forEach((e, i) => {
         const l = lastSets(e, D.date, D.editId);
         h += `<div class="card ${e.on ? '' : 'skip'}"><div class="hd"><div><b>${esc(e.n)}</b> <span class="mu">${esc(e.m)}</span>
@@ -411,7 +416,8 @@ document.addEventListener('click', async ev => {
         if (!isDate(date) || date > today()) { alert('Please choose a valid date that is not in the future.'); return }
         { const clash = S.logs.find(l => l.id !== (D.editId || '_new_') && l.date === date); if (clash) { alert('Another workout already exists on ' + date + '. Change the date or cancel the edit.'); return } }
         const di = wk(date);
-        const rec = { id: D.editId || uid(), date, day: FULL[di], year: +date.slice(0, 4), di, name: (S.plan[di] || {}).name || '', ex };
+        const existing = D.editId ? S.logs.find(l => l.id === D.editId) : null;
+        const rec = { id: D.editId || uid(), date, day: FULL[di], year: +date.slice(0, 4), di, name: existing ? (existing.name || '') : ((S.plan[di] || {}).name || ''), ex };
         const prevLogs = S.logs;
         S.logs = prevLogs.filter(l => l.id !== rec.id);
         S.logs.push(rec);
