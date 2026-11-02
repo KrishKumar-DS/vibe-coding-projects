@@ -281,6 +281,54 @@ section('Bug 5 — edit keeps identity; date conflicts are blocked');
 }
 
 // =====================================================================
+section('Bugs.md 6 — edited workout keeps its routine name across weekdays');
+const NAME_PLAN = JSON.parse(DEFAULTS).plan;
+const mondayLog = (name = 'Routine A') => ({
+  id: 'a1', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name,
+  ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }],
+});
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) } });
+  c.fireClick({ a: 'edit', id: 'a1' });
+  c.fireChange({ id: 'dt', value: '2026-10-13' }); // Tuesday
+  const html = c.dom.get('#v').innerHTML;
+  ok('edit header keeps the original routine name', html.includes('Routine A'));
+  ok('edit header does not adopt the destination routine name', !html.includes('Back + Biceps'));
+  c.fireClick({ a: 'fin' });
+  const rec = c.api.getS().logs[0];
+  eq('date moved to Tuesday', rec.date, '2026-10-13');
+  eq('record name preserved', rec.name, 'Routine A');
+  eq('original exercises preserved', rec.ex.map(e => e.n), ['Bench Press']);
+  eq('same record updated', c.api.getS().logs.map(l => l.id), ['a1']);
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) } });
+  c.fireClick({ a: 'edit', id: 'a1' });
+  c.fireClick({ a: 'day', i: '1' }); // Tuesday chip
+  eq('chip moves edit to Tuesday', c.api.getD().date, '2026-10-13');
+  c.fireClick({ a: 'fin' });
+  const rec = c.api.getS().logs[0];
+  eq('chip path preserves the record name', rec.name, 'Routine A');
+  eq('chip path preserves the exercises', rec.ex.map(e => e.n), ['Bench Press']);
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog('')] }) } });
+  c.fireClick({ a: 'edit', id: 'a1' });
+  c.fireChange({ id: 'dt', value: '2026-10-13' });
+  c.fireClick({ a: 'fin' });
+  eq('a blank original name stays blank', c.api.getS().logs[0].name, '');
+}
+{
+  const c = app({});
+  c.fireClick({ a: 'day', i: '1' }); // fresh Tuesday draft
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '40' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '10' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('new workout still uses the selected day routine name', c.api.getS().logs[0].name, c.api.getS().plan[1].name);
+}
+
+// =====================================================================
 section('Bug 6 — unsaved-changes warning on day switch');
 {
   const c = app({});
