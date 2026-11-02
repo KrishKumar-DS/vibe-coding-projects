@@ -226,7 +226,7 @@ The day chips map to dates within the same Monday-to-Sunday week as the currentl
 - Chips whose calculated date is in the future are disabled.
 - The click handler also rejects future dates defensively.
 - Selecting the currently selected weekday is a no-op.
-- When a saved workout is being edited, a day chip changes the workout date and its weekday index without reloading the routine exercise list.
+- When a saved workout is being edited, a day chip changes the workout date and its weekday index without reloading the routine exercise list or changing the workout's original name.
 
 ---
 
@@ -339,7 +339,7 @@ Saved workout fields:
 - A new workout receives a generated ID.
 - An edited workout keeps its existing ID.
 - The weekday name (`day`), year, and weekday index (`di`) are derived from the date.
-- The workout name is taken from the routine for the selected date's weekday.
+- The workout name is taken from the routine for the selected date's weekday when a workout is created; an edited workout keeps its original name.
 - Only completed sets are stored.
 
 If storage fails, the previous log collection is restored, the draft remains on screen, and the user is warned.
@@ -355,14 +355,14 @@ The user shall be able to open an existing workout from History and modify its r
 - Saving updates the original record rather than creating a duplicate.
 - The workout being edited is excluded from previous-performance lookup.
 - The date may be changed.
-- Changing the date updates the weekday index and routine context.
+- Changing the date updates the weekday index.
+- Changing the date across weekdays keeps the workout's original routine name and exercise list; the destination weekday's routine is not applied.
 - Changing the date to a date occupied by another workout is blocked.
 - A successful update clears the draft and returns to History.
 
 Current behavior and limitation:
 
-- The saved exercise list is not rebuilt when the date changes to a different weekday.
-- The saved workout's routine name is recalculated from the new date's routine when the update is saved. See Known Limitations.
+- The saved exercise list is not rebuilt when the date changes to a different weekday, so the original name and exercises stay together.
 
 ---
 
@@ -959,7 +959,7 @@ The interface should prioritize:
 - Day chips are horizontally scrollable when needed.
 - Future day chips are disabled.
 - The current weekday chip is highlighted with the accent color.
-- Changing the date while editing updates the date and weekday index without reloading the routine exercise list.
+- Changing the date while editing updates the date and weekday index without reloading the routine exercise list or changing the workout's original name.
 
 ## 11.5 Feedback and Confirmations
 
@@ -1189,7 +1189,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Negative weights are accepted and saved.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
-- Editing a workout and changing its date across weekdays updates its routine name but does not rebuild its exercise list.
+- Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
 - While editing, a weekday-chip date change can target an occupied date; the conflict is only reported at Finish.
 - History → Edit replaces an unsaved draft without a separate confirmation.
 - The History action labeled "+ Log / edit a past day" only switches to the Today view; the user must then choose a past date manually.
