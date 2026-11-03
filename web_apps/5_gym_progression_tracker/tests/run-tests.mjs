@@ -398,7 +398,7 @@ const historySeed = () => ({ gym_data: JSON.stringify({ plan: HISTORY_PLAN, logs
   const c = app({ seed: historySeed() });
   c.fireClick({ a: 'day', i: '0' });
   ok('draft persisted with baseline', !!c.store.get('gym_draft'));
-  const c2 = app({ seed: { gym_data: c.store.get('gym_data'), gym_draft: c.store.get('gym_draft') } });
+  const c2 = app({ seed: { gym_data: c.store.get('gym_data'), gym_draft: c.store.get('gym_draft') }, now: '2026-10-12T12:00:00' });
   ok('reloaded untouched draft still clean', c2.api.draftHasData(c2.api.getD()) === false);
   c2.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
   ok('reloaded draft still detects edits', c2.api.draftHasData(c2.api.getD()) === true);
@@ -534,11 +534,11 @@ const twoLogSeed = () => ({
   c0.fireClick({ a: 'edit', id: 'l1' });
   const legacy = JSON.parse(c0.store.get('gym_draft'));
   delete legacy.baseDate;
-  const c = app({ seed: { gym_data: c0.store.get('gym_data'), gym_draft: JSON.stringify(legacy) } });
+  const c = app({ seed: { gym_data: c0.store.get('gym_data'), gym_draft: JSON.stringify(legacy) }, now: '2026-10-05T12:00:00' });
   ok('legacy baseline draft loads clean', c.api.draftHasData(c.api.getD()) === false);
   eq('legacy baseline draft upgrades baseDate', c.api.getD().baseDate, c.api.getD().date);
-  c.fireChange({ id: 'dt', value: '2026-10-06' });
-  ok('upgraded legacy draft detects later date moves', c.api.draftHasData(c.api.getD()) === true);
+  c.fireChange({ id: 'dt', value: '2026-10-04' });
+  ok('upgraded legacy draft detects a date move', c.api.draftHasData(c.api.getD()) === true);
 }
 
 // =====================================================================
@@ -567,6 +567,74 @@ section('Date selector — future weekdays disabled, correct weekday mapping');
   c.fireClick({ a: 'edit', id: 'x' });
   c.fireClick({ a: 'day', i: '2' });
   eq('editing past week -> Wed chip selects past Wed (10-07)', c.api.getD().date, '2026-10-07');
+}
+
+// =====================================================================
+section('Draft rollover — reopening on a later day opens today, not the stale draft');
+{
+  // clean auto-created draft from Mon 12 Oct, reopened Tue 3 Nov
+  const mon = app({ seed: { gym_data: DEFAULTS }, now: '2026-10-12T12:00:00' });
+  eq('Mon boot creates a Mon draft', mon.api.getD().date, '2026-10-12');
+  const tue = app({ seed: { gym_data: DEFAULTS, gym_draft: mon.store.get('gym_draft') }, now: '2026-11-03T12:00:00' });
+  eq('clean stale draft rolls to today', tue.api.getD().date, '2026-11-03');
+  eq('rollover uses today\'s weekday', tue.api.getD().di, 1);
+  eq('rollover persists the new draft', JSON.parse(tue.store.get('gym_draft')).date, '2026-11-03');
+  tue.fireClick({ a: 'day', i: '0' });
+  eq('Mon chip after rollover selects this week Monday', tue.api.getD().date, '2026-11-02');
+}
+{
+  // a workout entered after the rollover must be saved to today
+  const mon = app({ seed: { gym_data: DEFAULTS }, now: '2026-10-12T12:00:00' });
+  const tue = app({ seed: { gym_data: DEFAULTS, gym_draft: mon.store.get('gym_draft') }, now: '2026-11-03T12:00:00' });
+  tue.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '60' });
+  tue.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  tue.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  tue.fireClick({ a: 'fin' });
+  eq('workout after rollover saves to today', tue.api.getS().logs[0].date, '2026-11-03');
+}
+{
+  // dirty drafts are not silently discarded; they are flagged with a Start today action
+  const mon = app({ seed: { gym_data: DEFAULTS }, now: '2026-10-12T12:00:00' });
+  mon.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  const tue = app({ seed: { gym_data: DEFAULTS, gym_draft: mon.store.get('gym_draft') }, now: '2026-11-03T12:00:00' });
+  eq('dirty stale draft keeps its date', tue.api.getD().date, '2026-10-12');
+  ok('dirty stale draft is flagged', tue.dom.get('#v').innerHTML.includes('Unfinished workout from'));
+  ok('flagged draft offers Start today', tue.dom.get('#v').innerHTML.includes('data-a="gotoday"'));
+  tue.ctl.confirm = false;
+  tue.fireClick({ a: 'gotoday' });
+  eq('cancel keeps the unfinished workout', tue.api.getD().date, '2026-10-12');
+  tue.ctl.confirm = true;
+  tue.fireClick({ a: 'gotoday' });
+  eq('confirm starts today', tue.api.getD().date, '2026-11-03');
+  ok('start today clears the old edit link', !tue.api.getD().editId);
+}
+{
+  // a past date chosen in this session is intentional, not a stale-draft warning
+  const c = app({});
+  c.fireClick({ a: 'day', i: '0' });
+  ok('deliberate past-date draft is not flagged', !c.dom.get('#v').innerHTML.includes('Unfinished workout from'));
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  c.fireClick({ a: 'tab', t: 'today' });
+  ok('entered data on a chosen past date is not flagged', !c.dom.get('#v').innerHTML.includes('Unfinished workout from'));
+}
+{
+  // a clean edit session from an earlier day also rolls forward
+  const seed = { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) };
+  const mon = app({ seed, now: '2026-10-12T12:00:00' });
+  eq('opening a saved workout creates an untouched edit draft', mon.api.getD().editId, 'a1');
+  const tue = app({ seed: { ...seed, gym_draft: mon.store.get('gym_draft') }, now: '2026-11-03T12:00:00' });
+  eq('clean stale edit draft rolls to today', tue.api.getD().date, '2026-11-03');
+  ok('rollover leaves edit mode', !tue.api.getD().editId);
+}
+{
+  // a dirty edit session is preserved with its edit link
+  const seed = { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) };
+  const mon = app({ seed, now: '2026-10-12T12:00:00' });
+  mon.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  const tue = app({ seed: { ...seed, gym_draft: mon.store.get('gym_draft') }, now: '2026-11-03T12:00:00' });
+  eq('dirty edit draft keeps its date', tue.api.getD().date, '2026-10-12');
+  eq('dirty edit draft keeps its edit link', tue.api.getD().editId, 'a1');
+  ok('dirty edit draft is flagged', tue.dom.get('#v').innerHTML.includes('Unfinished workout from'));
 }
 
 // =====================================================================
@@ -1045,7 +1113,7 @@ const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles 
   const c = app({ seed: {
     gym_data: JSON.stringify(duplicateData()),
     gym_draft: JSON.stringify(draft),
-  } });
+  }, now: '2026-10-06T12:00:00' });
   const second = c.api.getS().logs.find(l => l.date === '2026-10-06');
   eq('a draft is relinked to the repaired workout', c.api.getD().editId, second.id);
 }
@@ -1054,7 +1122,7 @@ const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles 
   const c = app({ seed: {
     gym_data: DEFAULTS,
     gym_draft: JSON.stringify(draft),
-  } });
+  }, now: '2026-10-07T12:00:00' });
   eq('a draft with a missing workout is cleared', c.api.getD().editId, '');
 }
 

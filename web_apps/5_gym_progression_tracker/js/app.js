@@ -165,13 +165,15 @@ function bootState() {
     return { S: normalizeData(raw), persist: true }
 }
 
-let S, D, tab = 'today', pick = null, planDay = null;
+let S, D, tab = 'today', pick = null, planDay = null, lastKnownToday = today(), staleDraftNotice = false;
 const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
 D = normDraft(Store.loadDraft());
 backfillXids();
 repairDraftEditId();
+staleDraftNotice = !!(D && D.date < today() && draftHasData(D));
+rollCleanDraftToToday();
 if (boot.persist) save();
 
 // Theme persistence (light / dark / system). Applies before first render.
@@ -217,8 +219,9 @@ function mk(e, date, skip) {
     const c = Math.max(1, +e.smin || 3);
     return { xid: e.id || '', n: e.n, m: e.m, smin: e.smin || '', smax: e.smax || '', rmin: e.rmin || '', rmax: e.rmax || '', on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
-function newDraft(di, date = today()) { D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
+function newDraft(di, date = today()) { staleDraftNotice = false; D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
 function fromLog(l) {
+    staleDraftNotice = false;
     const di = wk(l.date), pl = S.plan[di]?.ex || [];
     D = {
         date: l.date, di, editId: l.id, ex: l.ex.map(e => {
@@ -262,10 +265,22 @@ function repairDraftEditId() {
     D.editId = sameDate.length === 1 ? sameDate[0].id : '';
     if (!saveD()) Store.notifyStorageFailure()
 }
+// A clean draft left on an earlier day must not pin the app to that date after
+// a reload. Drafts with real unsaved work are preserved and flagged in Today.
+function rollCleanDraftToToday() {
+    if (!D || D.date >= today() || draftHasData(D)) return;
+    openDate(today());
+}
 
 function today_v() {
+    if (lastKnownToday !== today()) {
+        lastKnownToday = today();
+        staleDraftNotice = !!(D && D.date < today() && draftHasData(D));
+        rollCleanDraftToToday();
+    }
     if (!D) openDate(today());
-    let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="mu" style="margin-top:6px">✏️ Editing a saved workout. Changes update it.</div>' : ''}</div><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}"${dateForWeekday(i, D.date) > today() ? ' disabled' : ''}>${d}</button>`).join('')}</div>
+    const stale = staleDraftNotice && D.date < today();
+    let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="mu" style="margin-top:6px">✏️ Editing a saved workout. Changes update it.</div>' : ''}${stale ? `<div class="row" style="margin-top:8px"><span class="mu">Unfinished workout from ${fmt(D.date)}</span><button class="btn g" data-a="gotoday">Start today</button></div>` : ''}</div><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}"${dateForWeekday(i, D.date) > today() ? ' disabled' : ''}>${d}</button>`).join('')}</div>
  <div class="mu" style="margin-bottom:8px">${esc(draftName() || 'No routine set')}</div>`;
     D.ex.forEach((e, i) => {
         const l = lastSets(e, D.date, D.editId);
@@ -432,6 +447,11 @@ document.addEventListener('click', async ev => {
             fromLog(l); tab = 'today'
         }
     }
+    else if (a === 'gotoday') {
+        if (D && D.date >= today()) return;
+        if (!mayDiscard()) { render(); return }
+        openDate(today()); tab = 'today'
+    }
     else if (a === 'past') { tab = 'today' }
     else if (a === 'dl') {
         if (confirm('Delete this workout?')) {
@@ -461,6 +481,15 @@ document.addEventListener('click', async ev => {
         applyTheme(THEMES[(cur + 1) % THEMES.length]);
     }
     render()
+});
+
+// A tab left open across midnight should not keep showing yesterday's date.
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden || lastKnownToday === today()) return;
+    lastKnownToday = today();
+    staleDraftNotice = !!(D && D.date < today() && draftHasData(D));
+    rollCleanDraftToToday();
+    if (tab === 'today') render();
 });
 
 document.addEventListener('input', ev => {
