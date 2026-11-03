@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-01)
+**Date:** 2026-10-27 (last updated 2026-11-03)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **240 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **251 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 6 | P1 | Editing | Moving an edited workout across weekdays changes its name but not its exercises |
 | 7 | P2 | Editing | Weekday chips bypass the edit-date conflict check |
 | 8 | P2 | UI | Added exercises display a malformed target range |
 | 9 | P2 | Routine validation | Blank names and invalid set/rep ranges are allowed |
@@ -45,64 +44,15 @@
 
 > Items **19–33** were added in a follow-up review after the original 18. They are numbered separately so the existing references remain stable.
 
+> Item **6** is resolved; see **Resolved Items**.
+
 ### Recommended patch order
 
-1. Item **6** — edit semantics.
+1. Items **19–20** — P1 identity and past-day workflows.
 2. Items **7–11** — dead ends, invalid data, and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Items **17–18** — documentation and regression coverage.
-5. Follow-up items **19–20, 21–24, 26–33** — treat 19–20 as P1 and schedule them with the first data-integrity pass, then work down the remaining follow-up priorities.
-
----
-
-# Priority 1 — Data loss or incorrect saved data
-
-## 6. Editing a workout across weekdays changes the routine name but not the exercises
-
-**Priority:** P1
-**Where:** `js/app.js:334`
-
-### Problem
-
-`rec.name` is always taken from the selected date’s routine. If a Monday chest workout is moved to Tuesday, it becomes “Back + Biceps” while still containing bench press.
-
-### Reproduction
-
-1. Save a Monday workout containing Bench Press.
-2. Edit it.
-3. Change the date to Tuesday.
-4. Save.
-
-Result: the record is dated Tuesday and named “Back + Biceps,” but the exercises are still the Monday chest exercises.
-
-### Fix
-
-Preserve the original workout name when editing:
-
-```js
-const existing = D.editId
-    ? S.logs.find(l => l.id === D.editId)
-    : null;
-
-const rec = {
-    id: D.editId || uid(),
-    date,
-    day: FULL[di],
-    year: +date.slice(0, 4),
-    di,
-    name: existing ? existing.name : ((S.plan[di] || {}).name || ''),
-    ex
-};
-```
-
-Alternatively, store `D.name` in `fromLog()` and `newDraft()` and use that value on save.
-
-### Acceptance
-
-- New workouts use the selected date’s routine name.
-- Edited workouts preserve their original name when moved across weekdays.
-- The exercise list and name remain semantically consistent.
-- A deliberate rename flow, if added later, has an explicit UI.
+5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
 ---
 
@@ -1054,14 +1004,48 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 ---
 
+# Resolved Items
+
+## 6. Editing a workout across weekdays changes the routine name but not the exercises
+
+**Status:** Resolved
+
+### Original problem
+
+`rec.name` was always taken from the selected date’s routine. Moving a Monday chest workout to Tuesday renamed it “Back + Biceps” while keeping the Monday chest exercises.
+
+### Fix
+
+The workout name is now preserved when editing:
+
+- `js/app.js:236-239` — `draftName()` prefers the linked saved workout’s name while editing.
+- `js/app.js:419-420` — Finish keeps the existing record’s name instead of using the destination weekday’s routine name.
+
+Commits: `3c03201` (fix), `64e3d9f` (tests), `1913d9d` (PRD).
+
+Regression coverage: `tests/run-tests.mjs:284-329`.
+
+### Acceptance
+
+- [x] New workouts use the selected date’s routine name.
+- [x] Edited workouts preserve their original name when moved across weekdays.
+- [x] The exercise list and name remain semantically consistent.
+- [x] A deliberate rename flow, if added later, has an explicit UI.
+
+### Residual edge case
+
+After a workout is moved to another weekday, editing it again looks up target ranges from the destination weekday’s routine (`js/app.js:222-225`). The identity and name survive, but the target range may become blank or show “Extra exercise” because the exercise is not part of that weekday’s routine.
+
+---
+
 # Verification Checklist
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `240 passed, 0 failed`.
+- [ ] `node tests/run-tests.mjs` → `251 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
-- [ ] Moving an edited workout to another weekday keeps a consistent name and exercise list.
+- [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [ ] Weekday chips block occupied dates immediately while editing.
 - [ ] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
 - [ ] Blank routine exercises cannot silently enter saved workouts.

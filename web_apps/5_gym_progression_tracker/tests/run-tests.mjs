@@ -329,7 +329,7 @@ const mondayLog = (name = 'Routine A') => ({
 }
 
 // =====================================================================
-section('Bug 6 — unsaved-changes warning on day switch');
+section('Dirty draft — unsaved-changes warning on day switch');
 {
   const c = app({});
   c.fireClick({ a: 'day', i: '0' });

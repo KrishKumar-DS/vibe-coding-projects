@@ -13,7 +13,7 @@ No accounts, no backend, no build step. Open `index.html` in a browser and start
 3. Enter weight and reps per set, tick the sets you completed, then press **Finish & Save Workout**.
 4. Your workout appears under **History**.
 
-The app works offline after the first load. All data lives in your browser's `localStorage`.
+The app has no external dependencies. Serve the folder locally for reliable `localStorage` and clipboard behavior. All data lives in your browser's `localStorage`.
 
 ---
 
@@ -62,7 +62,7 @@ The Progress view groups exercise history by a stable exercise identity, so rena
 
 1. Go to **Routine**.
 2. Under **Backup**, press **Copy backup**.
-3. The full app state is serialized as JSON and copied to your clipboard (a text prompt appears if clipboard access is blocked).
+3. Your routine and workout history are serialized as JSON and copied to your clipboard (a text prompt appears if clipboard access is blocked).
 4. Paste it somewhere safe — a notes app, a file, or cloud storage.
 
 ### Restore a backup
@@ -72,7 +72,7 @@ The Progress view groups exercise history by a stable exercise identity, so rena
 3. Paste the backup JSON into the prompt.
 4. The app validates the `plan` and `logs` structures before replacing your current state.
 
-A malformed or incompatible backup is rejected and your current data is left untouched.
+Backups missing the `plan` object or `logs` array are rejected and your current data is left untouched. Malformed exercise or set entries inside a workout log may be dropped during normalization, and an incomplete plan can be normalized to blank or partial routine days; see [Limitations](#limitations).
 
 ---
 
@@ -100,7 +100,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-151 passed, 0 failed
+251 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -136,7 +136,7 @@ State is persisted in `localStorage` under three keys:
 | `gym_draft` | The in-progress workout draft, kept separate from completed history. |
 | `gym_theme` | Your theme preference (`light`, `dark`, or `system`). |
 
-If saved data is ever unreadable, the app keeps a recovery copy under a `gym_data_recovery_<timestamp>` key and falls back to defaults.
+If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads defaults. If the data parses but its structure is invalid, the app attempts a recovery copy and normalizes whatever it can, which can produce a blank or partial routine; see [Limitations](#limitations).
 
 ---
 
@@ -146,6 +146,8 @@ If saved data is ever unreadable, the app keeps a recovery copy under a `gym_dat
 - **Manual backups only.** There is no automatic cloud backup.
 - **No accounts or authentication.**
 - **No backend or database.**
+- **No offline guarantee.** There is no service worker, so offline behavior is not guaranteed in a served environment. Because there are no external assets, opening the files locally does not need a network connection.
+- **Limited import validation.** Malformed exercise or set entries inside logs may be dropped, and empty or future-dated workouts can be imported.
 - **Basic analytics.** Progression focuses on top-set weight, estimated 1RM, session count, and workout volume.
 - **No nutrition, body-weight, RPE/RIR, rest timer, or PR detection** in this version.
 

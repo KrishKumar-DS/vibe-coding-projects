@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 151 tests as of 2026-10-26
+**Automated Tests:** `node tests/run-tests.mjs` — 251 tests as of 2026-11-03
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -1509,7 +1509,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-151 passed, 0 failed
+251 passed, 0 failed
 ```
 
 ---
@@ -1530,7 +1530,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-10-26**.
+- This document describes the current implementation as of **2026-11-03**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.
