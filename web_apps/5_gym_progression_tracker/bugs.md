@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-03)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **251 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **271 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -1038,11 +1038,30 @@ After a workout is moved to another weekday, editing it again looks up target ra
 
 ---
 
+## 34. Reopening the app restored the previous draft date instead of today
+
+**Status:** Resolved
+
+### Original problem
+
+The app restored any valid `gym_draft` unconditionally. Because a draft is written merely by opening the Today view, reopening on a later day restored the previous date. The weekday chips were anchored to that date, and finishing could save a workout to the old date.
+
+### Fix
+
+- `rollCleanDraftToToday()` runs on boot and after a calendar-day change.
+- A draft before today with no unsaved changes is replaced by today's draft.
+- A stale draft with unsaved work is preserved and flagged in the Today view with a **Start today** action.
+- `lastKnownToday` prevents rollover from undoing a past date the user deliberately selects in the same session.
+
+Regression coverage: `tests/run-tests.mjs` section “Draft rollover — reopening on a later day opens today, not the stale draft”.
+
+---
+
 # Verification Checklist
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `251 passed, 0 failed`.
+- [ ] `node tests/run-tests.mjs` → `271 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.

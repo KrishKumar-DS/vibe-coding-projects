@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 251 tests as of 2026-11-03
+**Automated Tests:** `node tests/run-tests.mjs` — 271 tests as of 2026-11-03
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -514,8 +514,9 @@ Behavior:
 While a workout is being entered, the current draft shall be stored separately from completed workout history.
 
 - The draft is saved after every input or structural change.
-- The draft is restored on reload.
-- A saved draft may be for today or a past date.
+- The draft is restored on reload when it is for today or contains unsaved work.
+- A clean draft left on an earlier day is replaced by a draft for today on boot.
+- A draft for a past date with unsaved work keeps its date and is flagged in the Today view with a **Start today** action.
 - A successful workout save clears the draft.
 - A completed or updated workout does not appear in history until Finish/Update is pressed.
 
@@ -524,6 +525,7 @@ Draft baseline:
 - When a draft is created or loaded from a saved workout, the application stores a JSON baseline of the generated exercise state.
 - Unsaved-change detection compares the current exercise state with that baseline.
 - Automatically prefilled weights and untouched generated rows are not treated as unsaved work.
+- Clean drafts from an earlier date are treated as stale on boot and replaced by today's draft; drafts that differ from their baseline are preserved and flagged.
 - For legacy drafts without a baseline, the application treats a skipped exercise, completed set, or entered repetition as evidence of unsaved work.
 - When creating a new workout, a confirmation prompt is shown before changing the date or weekday if the draft differs from its baseline.
 - Edit-mode date changes retain the exercise list, so they do not trigger the discard prompt.
@@ -678,7 +680,7 @@ The application uses a fixed bottom navigation bar with four buttons:
 
 The active view is highlighted with the accent color and a top inset shadow.
 
-The application does not use URL routing. Reloading the page returns to the Today view, while the persisted draft determines the date shown.
+The application does not use URL routing. Reloading the page returns to the Today view. A clean draft from an earlier day is replaced with today's draft; a draft with unsaved work keeps its date and is flagged with a **Start today** action.
 
 ## 8.4 Rendering Model
 
@@ -911,6 +913,8 @@ The result of the boot-time save is not checked or reported.
 
 - The draft is written after every input or structural change.
 - Completing a workout writes `null` to `gym_draft`.
+- On boot, a draft dated before today that has no unsaved changes is replaced by today's draft.
+- A stale draft with unsaved changes is preserved and the Today view shows a **Start today** action.
 - Draft writes are independent of workout history writes.
 - A failed draft write does not undo the in-memory change.
 
@@ -1048,7 +1052,7 @@ Current expected result:
 
 ```text
 ============================================================
-223 passed, 0 failed
+271 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1192,6 +1196,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
 - While editing, a weekday-chip date change can target an occupied date; the conflict is only reported at Finish.
 - History → Edit replaces an unsaved draft without a separate confirmation.
+- A draft with unsaved work from an earlier day keeps that date until the user chooses **Start today**.
 - The History action labeled "+ Log / edit a past day" only switches to the Today view; the user must then choose a past date manually.
 - If clearing the draft fails after a successful save, the previous draft may reappear after reload.
 - Restore replaces the current state and clears the draft without a separate unsaved-change prompt.
@@ -1509,7 +1514,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-251 passed, 0 failed
+271 passed, 0 failed
 ```
 
 ---
