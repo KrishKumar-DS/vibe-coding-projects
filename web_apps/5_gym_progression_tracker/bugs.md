@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-03)
+**Date:** 2026-10-27 (last updated 2026-11-04)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **271 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **281 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 7 | P2 | Editing | Weekday chips bypass the edit-date conflict check |
 | 8 | P2 | UI | Added exercises display a malformed target range |
 | 9 | P2 | Routine validation | Blank names and invalid set/rep ranges are allowed |
 | 10 | P2 | Draft safety | Restore clears an unsaved draft without warning |
@@ -25,7 +24,6 @@
 | 14 | P3 | UX | “Log / edit a past day” does not actually choose a past day |
 | 15 | P3 | Storage | Boot-time and theme saves fail silently |
 | 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
-| 17 | Docs | Documentation | README contains stale backup and offline claims |
 | 18 | Tests | Test coverage | Missing regressions for the issues above |
 | 19 | P1 | Exercise identity | First-run plan IDs regenerate on reload, orphaning draft IDs |
 | 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
@@ -44,73 +42,17 @@
 
 > Items **19–33** were added in a follow-up review after the original 18. They are numbered separately so the existing references remain stable.
 
-> Item **6** is resolved; see **Resolved Items**.
-
 ### Recommended patch order
 
 1. Items **19–20** — P1 identity and past-day workflows.
-2. Items **7–11** — dead ends, invalid data, and escaping.
+2. Items **8–11** — dead ends, invalid data, and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
-4. Items **17–18** — documentation and regression coverage.
+4. Item **18** — regression coverage.
 5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
 ---
 
 # Priority 2 — Dead ends, invalid data, and security
-
-## 7. Weekday chips bypass the edit-date conflict check
-
-**Priority:** P2
-**Where:** `js/app.js:311-317`, compared with `js/app.js:387-390` and `js/app.js:332`
-
-### Problem
-
-While editing, clicking a weekday chip changes `D.date` even if another workout already exists on that date. The date picker blocks this immediately, and Finish blocks it later, but the chip leaves the user in a dead end.
-
-### Reproduction
-
-1. Have workouts on Monday and Tuesday.
-2. Edit the Monday workout.
-3. Click the Tuesday weekday chip.
-
-Result: the draft date changes to Tuesday. The conflict is only reported when Finish is pressed.
-
-### Fix
-
-Extract the existing conflict check into a helper:
-
-```js
-function dateTaken(date) {
-    return S.logs.some(
-        l => l.id !== (D.editId || '_new_') && l.date === date
-    );
-}
-```
-
-Use it in the weekday-chip handler when `D.editId` is set:
-
-```js
-if (D.editId) {
-    if (dateTaken(nv)) {
-        alert('Another workout already exists on ' + nv + '. Choose another date or cancel the edit.');
-        return;
-    }
-    D.date = nv;
-    D.di = wk(nv);
-    // save draft
-}
-```
-
-Use the same helper in the date input and Finish paths to avoid duplicated logic.
-
-### Acceptance
-
-- Weekday chips behave like the date picker during editing.
-- The user is told immediately about a conflict.
-- No dead-end state is created.
-- New drafts can still open an existing date for editing.
-
----
 
 ## 8. Added exercises display a malformed target range
 
@@ -445,38 +387,6 @@ Or use `Map` consistently.
 
 ---
 
-# Documentation
-
-## 17. README has stale claims
-
-**Priority:** Documentation
-**Where:** `README.md:16`, `README.md:65`, `README.md:75`, `README.md:139`
-
-### Problems
-
-- `README.md:65` says the “full app state” is serialized. The backup contains only `plan` and `logs`; theme and draft are excluded.
-- `README.md:16` says the app works offline after the first load. There is no service worker, so offline behavior in a served environment is not guaranteed.
-- `README.md:75` says a malformed or incompatible backup is rejected and current data is left untouched. The validator currently accepts malformed log exercises/sets and then silently drops them (item **22**), so a “successful” restore can lose data.
-- `README.md:139` says unreadable stored data falls back to defaults. For structurally invalid data, boot currently normalizes to a blank or partial plan instead of loading `def()` (item **21**), and then persists it.
-
-### Fix
-
-- Change “full app state” to “routine and workout history.”
-- Clarify that the app has no external dependencies but should be served locally for reliable `localStorage` and clipboard behavior.
-- Keep the existing note that data is browser-local and can be lost if storage is cleared.
-- Rewrite the backup-validation and recovery claims to match the actual fallback and drop behavior, or fix the code so the claims are true.
-- Note the PRD contradiction between “stable random IDs” (`docs/PRD.md:693`) and “do not immediately persist defaults” (`docs/PRD.md:878`); see item **19**.
-
-### Acceptance
-
-- README matches the actual backup payload.
-- README does not promise offline behavior the app does not guarantee.
-- README does not claim malformed backups are rejected while the validator silently drops data.
-- README accurately describes the recovery fallback.
-- The PRD and README do not contradict each other.
-
----
-
 # Test Coverage
 
 ## 18. Add regression tests for the fixes above
@@ -484,30 +394,29 @@ Or use `Map` consistently.
 **Priority:** Tests
 **Where:** `tests/run-tests.mjs`
 
-### Missing coverage
+### Remaining coverage
 
 Add tests for:
 
 1. Restore with a dirty draft prompts and preserves the draft on cancel.
-2. Editing a workout across weekdays preserves the original routine name.
-3. Weekday-chip date conflict while editing is blocked immediately.
-4. Draft and theme injection payloads remain escaped.
-5. Invalid theme values fall back to `system`.
-6. Routine validation rejects blank names and inverted ranges.
-7. Disabled future-day chips are rendered as disabled.
-8. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
-9. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-10. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-11. Restore and boot reject future-dated workouts.
-12. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-13. Imported duplicate dates do not make both records uneditable.
-14. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-15. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-16. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-17. A valid backup whose write fails reports a storage failure, not an invalid backup.
-18. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-19. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-20. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+2. Draft and theme injection payloads remain escaped.
+3. Invalid theme values fall back to `system`.
+4. Routine validation rejects blank names and inverted ranges.
+5. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+6. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
+7. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
+8. Restore and boot reject future-dated workouts.
+9. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
+10. Imported duplicate dates do not make both records uneditable.
+11. Deleting the currently edited workout with dirty changes warns before discarding the draft.
+12. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
+13. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
+14. A valid backup whose write fails reports a storage failure, not an invalid backup.
+15. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
+16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
+17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, and disabled future-day chip markup.
 
 ### Acceptance
 
@@ -1018,8 +927,8 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 The workout name is now preserved when editing:
 
-- `js/app.js:236-239` — `draftName()` prefers the linked saved workout’s name while editing.
-- `js/app.js:419-420` — Finish keeps the existing record’s name instead of using the destination weekday’s routine name.
+- `js/app.js:243-246` — `draftName()` prefers the linked saved workout’s name while editing.
+- `js/app.js:442` — Finish keeps the existing record’s name instead of using the destination weekday’s routine name.
 
 Commits: `3c03201` (fix), `64e3d9f` (tests), `1913d9d` (PRD).
 
@@ -1034,7 +943,66 @@ Regression coverage: `tests/run-tests.mjs:284-329`.
 
 ### Residual edge case
 
-After a workout is moved to another weekday, editing it again looks up target ranges from the destination weekday’s routine (`js/app.js:222-225`). The identity and name survive, but the target range may become blank or show “Extra exercise” because the exercise is not part of that weekday’s routine.
+After a workout is moved to another weekday, editing it again looks up target ranges from the destination weekday’s routine (`js/app.js:223-229`). The identity and name survive, but the target range may become blank or show “Extra exercise” because the exercise is not part of that weekday’s routine.
+
+---
+
+## 7. Weekday chips bypass the edit-date conflict check
+
+**Status:** Resolved
+
+### Original problem
+
+While editing, clicking a weekday chip changed `D.date` even when another workout already existed on that date. The date picker blocked the same move immediately, and Finish blocked it later, but the chip left the user in a dead end.
+
+### Fix
+
+- Added a shared `dateTaken(date)` helper in `js/app.js`.
+- Used it in the weekday-chip handler, the date input, and Finish.
+- The chip now reports the conflict immediately and leaves the draft date and weekday unchanged.
+- New drafts can still select an occupied date to open that workout for editing.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 7 — weekday chips block occupied dates while editing”.
+
+### Acceptance
+
+- [x] Weekday chips behave like the date picker during editing.
+- [x] The user is told immediately about a conflict.
+- [x] No dead-end state is created.
+- [x] New drafts can still open an existing date for editing.
+
+---
+
+## 17. README has stale claims
+
+**Status:** Resolved
+
+### Original problem
+
+`README.md` claimed that the “full app state” was backed up, that the app worked offline after the first load, that malformed backups were always rejected, and that unreadable stored data always fell back to defaults. It also omitted that malformed log entries can be dropped during normalization and that a structurally invalid plan can become blank or partial.
+
+### Fix
+
+`README.md` was updated to describe current behavior:
+
+- Backups contain the routine and workout history, not the theme or draft.
+- The app has no external dependencies, but should be served locally for reliable `localStorage` and clipboard behavior.
+- Malformed exercise or set entries may be dropped during restore.
+- A structurally invalid plan may be normalized to blank or partial routine days.
+- There is no service worker or offline guarantee.
+- Empty or future-dated workouts can currently be imported.
+
+Commit: `c159345` (README and PRD wording).
+
+### Acceptance
+
+- [x] README matches the actual backup payload.
+- [x] README does not promise offline behavior the app does not guarantee.
+- [x] README does not claim malformed backups are rejected while the validator silently drops data.
+- [x] README accurately describes the recovery fallback.
+- [x] README and the PRD limitations describe the same behavior.
+
+The PRD contradiction between “stable random IDs” and “do not immediately persist defaults” remains tracked under item **19**.
 
 ---
 
@@ -1061,11 +1029,11 @@ Regression coverage: `tests/run-tests.mjs` section “Draft rollover — reopeni
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `271 passed, 0 failed`.
+- [ ] `node tests/run-tests.mjs` → `281 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
-- [ ] Weekday chips block occupied dates immediately while editing.
+- [x] Weekday chips block occupied dates immediately while editing.
 - [ ] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
 - [ ] Blank routine exercises cannot silently enter saved workouts.
 - [ ] Injected draft/theme payloads render as text.
@@ -1073,7 +1041,7 @@ After applying the fixes, verify:
 - [ ] Disabled future-day chips are visually distinct.
 - [ ] Native controls follow dark mode.
 - [ ] Storage failures are reported on boot and theme changes.
-- [ ] README matches the updated PRD.
+- [x] README matches the updated PRD.
 - [ ] First boot followed by reload keeps draft and plan identities aligned.
 - [ ] After today is saved, a separate past-day workout can be created without moving today's record.
 - [ ] Corrupt/empty `gym_data` does not silently erase the default routine.

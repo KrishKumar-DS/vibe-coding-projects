@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 271 tests as of 2026-11-03
+**Automated Tests:** `node tests/run-tests.mjs` — 281 tests as of 2026-11-04
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -227,6 +227,7 @@ The day chips map to dates within the same Monday-to-Sunday week as the currentl
 - The click handler also rejects future dates defensively.
 - Selecting the currently selected weekday is a no-op.
 - When a saved workout is being edited, a day chip changes the workout date and its weekday index without reloading the routine exercise list or changing the workout's original name.
+- A day chip targeting a date occupied by another workout is blocked immediately with a message.
 
 ---
 
@@ -242,7 +243,7 @@ The application shall allow the user to select a workout date.
 - Selecting a date that already has a saved workout opens that workout for editing.
 - Selecting a date without a saved workout creates a new draft using that date's routine.
 - The application prevents creating a second saved workout on the same date through the UI; duplicate dates can still be introduced by an imported backup.
-- When editing, changing the date to a date occupied by another workout is blocked immediately by the date input and again at save time.
+- When editing, changing the date to a date occupied by another workout is blocked immediately by the date input and day chips, and again at save time.
 
 ---
 
@@ -357,7 +358,7 @@ The user shall be able to open an existing workout from History and modify its r
 - The date may be changed.
 - Changing the date updates the weekday index.
 - Changing the date across weekdays keeps the workout's original routine name and exercise list; the destination weekday's routine is not applied.
-- Changing the date to a date occupied by another workout is blocked.
+- Changing the date to a date occupied by another workout is blocked by the date input and day chips.
 - A successful update clears the draft and returns to History.
 
 Current behavior and limitation:
@@ -1045,14 +1046,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, backup validation, checked-set saving, edit identity and conflicts, duplicate ID repair, dirty-draft detection, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
+- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-271 passed, 0 failed
+281 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1190,12 +1191,11 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Only one workout can be created per date through the UI; imported backups may contain duplicate dates.
 - A set requires both a completed checkbox and repetitions to be saved.
 - A blank weight is stored as `0`.
-- Negative weights are accepted and saved.
+- Negative weights are clamped to zero before saving.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
 - Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
-- While editing, a weekday-chip date change can target an occupied date; the conflict is only reported at Finish.
-- History → Edit replaces an unsaved draft without a separate confirmation.
+- History → Edit prompts before replacing an unsaved draft.
 - A draft with unsaved work from an earlier day keeps that date until the user chooses **Start today**.
 - The History action labeled "+ Log / edit a past day" only switches to the Today view; the user must then choose a past date manually.
 - If clearing the draft fails after a successful save, the previous draft may reappear after reload.
@@ -1205,11 +1205,11 @@ Acceptance also requires that malformed stored data does not crash the app and t
 
 ## 15.3 Identity and Progression
 
-- Custom exercises added during a workout receive an empty `xid`.
-- Custom exercises use name-based identity until a reload backfills them, and only when the name maps unambiguously to one routine exercise.
-- A custom exercise whose name matches a routine exercise with stable identity may not prefill previous performance.
-- Custom-exercise prefill searches the latest matching log without limiting it to the selected workout date.
-- Progress may show two entries for the same exercise until reload backfills the added exercise.
+- Custom exercises that match exactly one routine exercise reuse that exercise's stable `xid`, muscle group, and target ranges.
+- Custom exercises that do not match a unique routine exercise receive an empty `xid` and use name-based identity until a reload backfills them, and only when the name maps unambiguously to one routine exercise.
+- A custom exercise whose name matches a unique routine exercise prefills from that exercise's history.
+- Custom-exercise prefill is limited to workouts before the selected draft date.
+- Known routine exercises added during a workout do not create a duplicate Progress entry; unknown name-based exercises may still need a reload before their identity is backfilled.
 - The backfill heuristic only assigns identities when an exercise name maps to exactly one routine identity across the entire plan.
 - If multiple entries in one workout share the same identity/name, only the first is used by Progression.
 - An exercise removed from the routine remains in history but may keep an old label.
@@ -1291,14 +1291,8 @@ Future development should be divided into stages rather than added indiscriminat
 Short-term improvements that align the implementation more closely with this document:
 
 - Give custom exercises a stable identity.
-- Bound custom-exercise prefill to the selected date.
-- Resolve prefill for custom exercises whose names match routine exercises.
 - Fix the custom-exercise range label.
 - Validate routine names and set/rep ranges.
-- Reject or clamp negative weights.
-- Prevent History → Edit from discarding a dirty draft without confirmation.
-- Preserve or deliberately update the workout name when an edited date crosses weekdays.
-- Apply the date-conflict check to weekday chips during editing.
 - Escape draft set values and the theme label.
 - Reject or repair duplicate dates on restore.
 - Add a schema version and migration path.
@@ -1514,7 +1508,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-271 passed, 0 failed
+281 passed, 0 failed
 ```
 
 ---
@@ -1535,7 +1529,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-11-03**.
+- This document describes the current implementation as of **2026-11-04**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.
