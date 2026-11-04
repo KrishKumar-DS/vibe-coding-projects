@@ -281,6 +281,44 @@ section('Bug 5 — edit keeps identity; date conflicts are blocked');
 }
 
 // =====================================================================
+section('Bugs.md 7 — weekday chips block occupied dates while editing');
+{
+  const logs = [
+    { id: 'mon', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: 'Routine A', ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }] },
+    { id: 'tue', date: '2026-10-13', day: 'Tuesday', year: 2026, di: 1, name: 'Routine B', ex: [{ n: 'Lat Pulldown', m: 'Back', xid: '', sets: [{ w: 40, r: 10 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs }) } });
+  c.fireClick({ a: 'edit', id: 'mon' });
+  c.fireClick({ a: 'day', i: '1' });
+  ok('occupied chip is blocked with a message', c.alerts.some(a => a.includes('Another workout already exists')));
+  eq('occupied chip keeps the edit date', c.api.getD().date, '2026-10-12');
+  eq('occupied chip keeps the weekday index', c.api.getD().di, 0);
+  eq('occupied chip leaves both workouts intact', c.api.getS().logs.map(l => l.id).sort(), ['mon', 'tue']);
+  c.fireClick({ a: 'fin' });
+  eq('blocked chip still allows saving the original workout', c.api.getS().logs.find(l => l.id === 'mon').date, '2026-10-12');
+}
+{
+  const logs = [
+    { id: 'wed', date: '2026-10-07', day: 'Wednesday', year: 2026, di: 2, name: 'Routine C', ex: [{ n: 'Squat', m: 'Legs', xid: '', sets: [{ w: 80, r: 5 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs }) } });
+  c.fireClick({ a: 'edit', id: 'wed' });
+  c.fireClick({ a: 'day', i: '1' });
+  eq('free chip moves the edit date', c.api.getD().date, '2026-10-06');
+  eq('free chip updates the weekday index', c.api.getD().di, 1);
+}
+{
+  const logs = [
+    { id: 'mon', date: '2026-10-12', day: 'Monday', year: 2026, di: 0, name: 'Routine A', ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs }) } });
+  ok('new draft starts without an edit identity', !c.api.getD().editId);
+  c.fireClick({ a: 'day', i: '0' });
+  eq('occupied chip from a new draft opens the workout for editing', c.api.getD().editId, 'mon');
+  eq('occupied chip from a new draft loads its date', c.api.getD().date, '2026-10-12');
+}
+
+// =====================================================================
 section('Bugs.md 6 — edited workout keeps its routine name across weekdays');
 const NAME_PLAN = JSON.parse(DEFAULTS).plan;
 const mondayLog = (name = 'Routine A') => ({
