@@ -234,6 +234,10 @@ function fromLog(l) {
     if (!saveD()) Store.notifyStorageFailure()
 }
 function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
+function dateTaken(date) {
+    return S.logs.some(l => l.id !== (D.editId || '_new_') && l.date === date)
+}
+const dateConflictMsg = date => `Another workout already exists on ${date}. Choose another date or cancel the edit.`;
 // A saved workout keeps the name it was created with, even if it is later
 // moved to another weekday. New drafts use the selected weekday's routine name.
 function draftName() {
@@ -401,7 +405,10 @@ document.addEventListener('click', async ev => {
         const nv = dateForWeekday(i, D.date);
         if (nv > today()) return; // never allow selecting a future date
         if (nv === D.date) return;
-        if (D.editId) { D.date = nv; D.di = wk(nv); if (!saveD()) Store.notifyStorageFailure() }
+        if (D.editId) {
+            if (dateTaken(nv)) { alert(dateConflictMsg(nv)); render(); return }
+            D.date = nv; D.di = wk(nv); if (!saveD()) Store.notifyStorageFailure()
+        }
         else { if (!mayDiscard()) { render(); return } openDate(nv) }
     }
     else if (a === 'tog') { D.ex[i].on = !D.ex[i].on; if (!saveD()) Store.notifyStorageFailure() }
@@ -429,7 +436,7 @@ document.addEventListener('click', async ev => {
         if (!ex.length) { alert('Mark at least one set as completed and enter its repetitions.'); return }
         const date = D.date;
         if (!isDate(date) || date > today()) { alert('Please choose a valid date that is not in the future.'); return }
-        { const clash = S.logs.find(l => l.id !== (D.editId || '_new_') && l.date === date); if (clash) { alert('Another workout already exists on ' + date + '. Change the date or cancel the edit.'); return } }
+        if (dateTaken(date)) { alert(dateConflictMsg(date)); return }
         const di = wk(date);
         const existing = D.editId ? S.logs.find(l => l.id === D.editId) : null;
         const rec = { id: D.editId || uid(), date, day: FULL[di], year: +date.slice(0, 4), di, name: existing ? (existing.name || '') : ((S.plan[di] || {}).name || ''), ex };
@@ -506,7 +513,7 @@ document.addEventListener('change', ev => {
         if (v > today()) { alert('Future dates are not allowed.'); render(); return }
         if (v === D.date) { render(); return }
         if (D.editId) {
-            if (S.logs.find(l => l.id !== D.editId && l.date === v)) { alert('Another workout already exists on ' + v + '. Choose another date or cancel the edit.'); render(); return }
+            if (dateTaken(v)) { alert(dateConflictMsg(v)); render(); return }
             D.date = v; D.di = wk(v); if (!saveD()) Store.notifyStorageFailure()
         }
         else { if (!mayDiscard()) { render(); return } openDate(v) }
