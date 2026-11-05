@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-04)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **281 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **288 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 8 | P2 | UI | Added exercises display a malformed target range |
 | 9 | P2 | Routine validation | Blank names and invalid set/rep ranges are allowed |
 | 10 | P2 | Draft safety | Restore clears an unsaved draft without warning |
 | 11 | P2 | Security | Draft values and the theme label are inserted into HTML unescaped |
@@ -45,7 +44,7 @@
 ### Recommended patch order
 
 1. Items **19–20** — P1 identity and past-day workflows.
-2. Items **8–11** — dead ends, invalid data, and escaping.
+2. Items **9–11** — dead ends, invalid data, and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Item **18** — regression coverage.
 5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
@@ -53,46 +52,6 @@
 ---
 
 # Priority 2 — Dead ends, invalid data, and security
-
-## 8. Added exercises display a malformed target range
-
-**Priority:** P2
-**Where:** `js/app.js:208`, with `addx` at `js/app.js:332-345`
-
-### Problem
-
-The target label is built only when `e.smin` is truthy, and it always renders both ranges. A partially configured exercise — for example sets set but reps blank, or an imported plan with `smin: 3` and no `rmin`/`rmax` — displays:
-
-> `3- sets × - reps`
-
-`addx` now passes empty ranges for unknown exercises, so the original custom-exercise case shows “Extra exercise”, but the label builder still produces malformed output for partial ranges.
-
-### Reproduction
-
-1. Set a routine exercise's sets min/max and leave its reps min/max blank (or restore a plan with partial ranges).
-2. Open Today for that routine day.
-3. Look at the exercise's target line.
-
-### Fix
-
-Build the label from only the ranges that exist:
-
-```js
-const parts = [];
-if (e.smin) parts.push(`${e.smin}-${e.smax} sets`);
-if (e.rmin) parts.push(`${e.rmin}-${e.rmax} reps`);
-const target = parts.length ? parts.join(' × ') : 'Extra exercise';
-```
-
-`addx` now passes empty ranges for unknown custom exercises, so they show “Extra exercise.”
-
-### Acceptance
-
-- Custom exercises without rep targets show “Extra exercise.”
-- Partially configured exercises show only the configured range.
-- Routine exercises with full ranges keep their current label.
-
----
 
 ## 9. Routine names and ranges are not validated
 
@@ -973,6 +932,34 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 7 — weekday chip
 
 ---
 
+## 8. Added exercises displayed a malformed target range
+
+**Status:** Resolved
+
+### Original problem
+
+The Today target label required a sets minimum and always rendered both ranges, so partial routines displayed malformed strings such as `3- sets × - reps`. Exercises with only reps configured were labeled “Extra exercise.”
+
+### Fix
+
+`targetLabel()` and `rangePart()` in `js/app.js` now build the label from each configured bound:
+
+- Full ranges keep the current `3-4 sets × 6-10 reps` form.
+- A missing maximum renders as `3+ sets` / `8+ reps`.
+- A missing minimum renders as `≤4 sets` / `≤10 reps`.
+- No configured targets render as “Extra exercise.”
+
+### Acceptance
+
+- [x] Exercises without any target ranges show “Extra exercise.”
+- [x] Partially configured exercises show only the configured range.
+- [x] Routine exercises with full ranges keep their previous label.
+- [x] Unknown custom exercises added through the add-exercise form show “Extra exercise.”
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 8 — target labels show only configured ranges”.
+
+---
+
 ## 17. README has stale claims
 
 **Status:** Resolved
@@ -1029,12 +1016,12 @@ Regression coverage: `tests/run-tests.mjs` section “Draft rollover — reopeni
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `281 passed, 0 failed`.
+- [ ] `node tests/run-tests.mjs` → `288 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [x] Weekday chips block occupied dates immediately while editing.
-- [ ] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
+- [x] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
 - [ ] Blank routine exercises cannot silently enter saved workouts.
 - [ ] Injected draft/theme payloads render as text.
 - [ ] Invalid theme values fall back to `system`.

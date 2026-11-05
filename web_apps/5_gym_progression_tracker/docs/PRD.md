@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 281 tests as of 2026-11-04
+**Automated Tests:** `node tests/run-tests.mjs` — 288 tests as of 2026-11-04
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -1053,7 +1053,7 @@ Current expected result:
 
 ```text
 ============================================================
-281 passed, 0 failed
+288 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1223,7 +1223,6 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Set and rep bounds can be missing, negative, or inverted.
 - `smin` of zero falls back to three initial sets.
 - Minimum and maximum sets/reps are guidance only and are not enforced.
-- Custom exercises currently display a malformed range label such as `3-3 sets × - reps`.
 - Routine changes save immediately; there is no explicit save or undo.
 - Deleting a routine exercise has no confirmation.
 - Duplicate routine exercise names are allowed.
@@ -1508,7 +1507,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-281 passed, 0 failed
+288 passed, 0 failed
 ```
 
 ---
