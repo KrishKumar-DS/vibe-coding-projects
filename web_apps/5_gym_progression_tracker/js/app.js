@@ -245,6 +245,23 @@ function draftName() {
     return existing ? (existing.name || '') : ((S.plan[D.di] || {}).name || '')
 }
 function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
+function rangePart(min, max, unit) {
+    const lo = Number.isFinite(+min) && +min > 0 ? +min : null;
+    const hi = Number.isFinite(+max) && +max > 0 ? +max : null;
+    if (lo == null && hi == null) return '';
+    if (lo == null) return `≤${hi} ${unit}`;
+    if (hi == null) return `${lo}+ ${unit}`;
+    return `${lo}-${hi} ${unit}`;
+}
+// Show only the targets that exist, so partial routines never render
+// dangling ranges such as "3- sets × - reps".
+function targetLabel(e) {
+    const parts = [
+        rangePart(e.smin, e.smax, 'sets'),
+        rangePart(e.rmin, e.rmax, 'reps')
+    ].filter(Boolean);
+    return parts.length ? parts.join(' × ') : 'Extra exercise';
+}
 // "Dirty" = differs from the auto-generated baseline that newDraft/fromLog
 // snapshot into D.base/D.baseDate, so auto-prefilled weights and the initial
 // date are not unsaved work. Legacy drafts saved before base/baseDate existed
@@ -289,7 +306,7 @@ function today_v() {
     D.ex.forEach((e, i) => {
         const l = lastSets(e, D.date, D.editId);
         h += `<div class="card ${e.on ? '' : 'skip'}"><div class="hd"><div><b>${esc(e.n)}</b> <span class="mu">${esc(e.m)}</span>
-  <div class="mu">${e.smin ? `${e.smin}-${e.smax} sets × ${e.rmin}-${e.rmax} reps` : 'Extra exercise'}${l ? ` · Last: ${l.map(s => s.w + '×' + s.r).join(', ')}` : ''}</div></div>
+  <div class="mu">${targetLabel(e)}${l ? ` · Last: ${l.map(s => s.w + '×' + s.r).join(', ')}` : ''}</div></div>
   <button class="chip" data-a="tog" data-i="${i}">${e.on ? 'Skip' : 'Include'}</button></div>`;
         if (e.on) {
             e.sets.forEach((s, j) => {
