@@ -985,6 +985,28 @@ const cableFlyLogs = [
 }
 
 // =====================================================================
+section('Bugs.md 8 — target labels show only configured ranges');
+const targetOf = html => (html.match(/<div class="mu">([^<]*)<\/div>/) || [])[1] || '';
+const todayHTML = ranges => app({
+  seed: { gym_data: JSON.stringify({
+    plan: { 1: { name: 'Push', ex: [{ id: 'e1', n: 'Press', m: 'Chest', ...ranges }] } },
+    logs: []
+  }) }
+}).dom.get('#v').innerHTML;
+eq('sets only', targetOf(todayHTML({ smin: 3, smax: 4, rmin: '', rmax: '' })), '3-4 sets');
+eq('reps only', targetOf(todayHTML({ smin: '', smax: '', rmin: 6, rmax: 10 })), '6-10 reps');
+eq('full ranges', targetOf(todayHTML({ smin: 3, smax: 4, rmin: 6, rmax: 10 })), '3-4 sets × 6-10 reps');
+eq('min without max', targetOf(todayHTML({ smin: 3, smax: '', rmin: '', rmax: '' })), '3+ sets');
+eq('max without min', targetOf(todayHTML({ smin: '', smax: 4, rmin: '', rmax: '' })), '≤4 sets');
+eq('no ranges', targetOf(todayHTML({ smin: '', smax: '', rmin: '', rmax: '' })), 'Extra exercise');
+{
+  // Unknown custom exercise: addx passes empty ranges, so no targets appear.
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: { 1: { name: '', ex: [] } }, logs: [] }) } });
+  addExercise(c, 'Cable Fly');
+  eq('custom exercise without targets', targetOf(c.dom.get('#v').innerHTML), 'Extra exercise');
+}
+
+// =====================================================================
 section('Bug 3 — negative weights are clamped; zero and decimals stay valid');
 
 // Finish the first set of today's first exercise with the given weight/reps.
