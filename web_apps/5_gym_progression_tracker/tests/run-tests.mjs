@@ -1007,6 +1007,98 @@ eq('no ranges', targetOf(todayHTML({ smin: '', smax: '', rmin: '', rmax: '' })),
 }
 
 // =====================================================================
+section('Bugs.md 9 — routine names and ranges are validated');
+const rangePlan = ranges => ({
+  plan: { 1: { name: 'Push', ex: [{ id: 'e1', n: 'Press', m: 'Chest', ...ranges }] } },
+  logs: []
+});
+const rangedApp = ranges => app({ seed: { gym_data: JSON.stringify(rangePlan(ranges)) } });
+const planEx = c => c.api.getS().plan[1].ex[0];
+
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireInput({ dataset: { p: 'smin', i: '0' }, value: '-5' });
+  eq('negative set minimum becomes blank', planEx(c).smin, '');
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireInput({ dataset: { p: 'smin', i: '0' }, value: '0' });
+  eq('zero set minimum becomes blank', planEx(c).smin, '');
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireInput({ dataset: { p: 'rmin', i: '0' }, value: '6.9' });
+  eq('decimal rep minimum floors to an integer', planEx(c).rmin, 6);
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireInput({ dataset: { p: 'rmax', i: '0' }, value: '' });
+  eq('blank maximum stays blank', planEx(c).rmax, '');
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireChange({ dataset: { p: 'smax', i: '0' }, value: '2' });
+  eq('editing set max below min lowers min', [planEx(c).smin, planEx(c).smax], [2, 2]);
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireChange({ dataset: { p: 'smin', i: '0' }, value: '8' });
+  eq('editing set min above max raises max', [planEx(c).smin, planEx(c).smax], [8, 8]);
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireChange({ dataset: { p: 'rmax', i: '0' }, value: '5' });
+  eq('editing rep max below min lowers min', [planEx(c).rmin, planEx(c).rmax], [5, 5]);
+}
+{
+  const c = rangedApp({ smin: 3, smax: 4, rmin: 6, rmax: 10 });
+  c.fireChange({ dataset: { p: 'smin', i: '0' }, value: '3' });
+  eq('valid ranges are unchanged', [planEx(c).smin, planEx(c).smax, planEx(c).rmin, planEx(c).rmax], [3, 4, 6, 10]);
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify(rangePlan({ smin: 8, smax: 4, rmin: -2, rmax: 0 })) } });
+  const e = planEx(c);
+  eq('boot raises max to min', [e.smin, e.smax], [8, 8]);
+  eq('boot drops negative and zero reps', [e.rmin, e.rmax], ['', '']);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.ctl.prompt = JSON.stringify({ plan: { 1: { name: 'Push', ex: [{ id: 'e2', n: 'Press', m: 'Chest', smin: 5, smax: 2, rmin: 8, rmax: 4 }] } }, logs: [] });
+  c.fireClick({ a: 'rs' });
+  const e = c.api.getS().plan[1].ex[0];
+  eq('restore raises set max to min', [e.smin, e.smax], [5, 5]);
+  eq('restore raises rep max to min', [e.rmin, e.rmax], [8, 8]);
+}
+{
+  const c = app({});
+  c.fireClick({ a: 'tab', t: 'routine' });
+  const html = c.dom.get('#v').innerHTML;
+  for (const k of ['smin', 'smax', 'rmin', 'rmax']) {
+    const re = new RegExp(`<input type="number" min="1" step="1" data-p="${k}"`);
+    ok(`${k} input enforces min 1 and integer steps`, re.test(html));
+  }
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: { 1: { name: 'Push', ex: [{ id: 'bn', n: '   ', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }] } }, logs: [] }) } });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('blank-named exercise with completed sets is not saved', c.api.getS().logs.length, 0);
+  ok('finish explains the blank name', c.alerts.some(a => /name every exercise/i.test(a)));
+}
+{
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: { 1: { name: 'Push', ex: [
+    { id: 'bn', n: '', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'ok', n: 'Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }
+  ] } }, logs: [] }) } });
+  c.fireInput({ dataset: { f: 'r', i: '1', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '1', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('blank row without completed sets does not block save', c.api.getS().logs.length, 1);
+  eq('only the named exercise is saved', c.api.getS().logs[0].ex.map(e => e.n), ['Press']);
+}
+
+// =====================================================================
 section('Bug 3 — negative weights are clamped; zero and decimals stay valid');
 
 // Finish the first set of today's first exercise with the given weight/reps.
