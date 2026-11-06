@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-04)
+**Date:** 2026-10-27 (last updated 2026-11-06)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **288 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **308 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 9 | P2 | Routine validation | Blank names and invalid set/rep ranges are allowed |
 | 10 | P2 | Draft safety | Restore clears an unsaved draft without warning |
 | 11 | P2 | Security | Draft values and the theme label are inserted into HTML unescaped |
 | 12 | P3 | CSS | Disabled future-day chips look enabled |
@@ -44,7 +43,7 @@
 ### Recommended patch order
 
 1. Items **19–20** — P1 identity and past-day workflows.
-2. Items **9–11** — dead ends, invalid data, and escaping.
+2. Items **10–11** — draft safety and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Item **18** — regression coverage.
 5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
@@ -52,48 +51,6 @@
 ---
 
 # Priority 2 — Dead ends, invalid data, and security
-
-## 9. Routine names and ranges are not validated
-
-**Priority:** P2
-**Where:** `js/app.js:354` (`padd`), `js/app.js:289-291` (routine inputs)
-
-### Problem
-
-- `padd` adds an exercise with an empty name.
-- Range fields can be blank, negative, or inverted.
-- Partial values produce labels such as `3- sets × 6-10 reps`.
-- A workout can be saved with an empty exercise name.
-
-### Fix
-
-Add `min="1"` to all four range inputs and normalize values before use or save:
-
-- Require a non-empty exercise name before Finish.
-- Ensure `smax >= smin` and `rmax >= rmin`.
-- Default missing values to sensible numbers, or ignore incomplete rows.
-- Skip exercises with blank names during workout saving.
-
-Example normalization helper:
-
-```js
-function normalizeRange(min, max, fallbackMin, fallbackMax) {
-    const a = Math.max(1, Math.floor(+min || fallbackMin));
-    const b = Math.max(a, Math.floor(+max || fallbackMax));
-    return [a, b];
-}
-```
-
-Call it when routine fields change or before constructing a draft.
-
-### Acceptance
-
-- Blank routine names cannot produce saved blank exercises.
-- Minimums cannot exceed maximums.
-- Partial ranges do not render malformed labels.
-- Existing valid routines are unchanged.
-
----
 
 ## 10. Restore clears an unsaved draft without warning
 
@@ -360,7 +317,7 @@ Add tests for:
 1. Restore with a dirty draft prompts and preserves the draft on cancel.
 2. Draft and theme injection payloads remain escaped.
 3. Invalid theme values fall back to `system`.
-4. Routine validation rejects blank names and inverted ranges.
+4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
 5. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
 6. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
 7. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
@@ -874,6 +831,35 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 9. Routine names and ranges are not validated
+
+**Status:** Resolved
+
+### Original problem
+
+- `padd` added an exercise with an empty name.
+- Range fields could be blank, negative, or inverted.
+- A workout could be saved with an empty exercise name.
+
+### Fix
+
+- `normBound()` normalizes present bounds to whole numbers of at least 1; blank, zero, and legacy negative values become empty targets.
+- `normalizeRanges()` repairs stored minimum/maximum pairs on boot, restore, and draft load; `fixEditedRange()` makes the field just edited authoritative during routine editing.
+- All four routine range inputs have `min="1" step="1"`.
+- Finish blocks a blank-named exercise that has completed sets instead of saving an unreadable entry.
+- Blank routine day names remain allowed for rest days.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 9 — routine names and ranges are validated”.
+
+### Acceptance
+
+- [x] Blank routine names cannot produce saved blank exercises.
+- [x] Minimums cannot exceed maximums.
+- [x] Partial ranges do not render malformed labels.
+- [x] Existing valid routines are unchanged.
+
+---
+
 ## 6. Editing a workout across weekdays changes the routine name but not the exercises
 
 **Status:** Resolved
@@ -1016,13 +1002,14 @@ Regression coverage: `tests/run-tests.mjs` section “Draft rollover — reopeni
 
 After applying the fixes, verify:
 
-- [ ] `node tests/run-tests.mjs` → `288 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `308 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [x] Weekday chips block occupied dates immediately while editing.
 - [x] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
-- [ ] Blank routine exercises cannot silently enter saved workouts.
+- [x] Blank routine exercises cannot silently enter saved workouts.
+- [x] Routine bounds are whole numbers of at least 1, and minimums cannot exceed maximums.
 - [ ] Injected draft/theme payloads render as text.
 - [ ] Invalid theme values fall back to `system`.
 - [ ] Disabled future-day chips are visually distinct.

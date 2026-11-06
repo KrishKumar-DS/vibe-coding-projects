@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 288 tests as of 2026-11-04
+**Automated Tests:** `node tests/run-tests.mjs` — 308 tests as of 2026-11-06
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -335,6 +335,8 @@ When the user finishes a workout:
 9. The workout is stored in history.
 10. The draft is cleared after a successful save.
 
+Finish also blocks when an included exercise with completed sets has a blank name; the user must name or remove it first.
+
 Saved workout fields:
 
 - A new workout receives a generated ID.
@@ -480,7 +482,9 @@ Behavior:
 - There is no drag-and-drop or reorder control.
 - Removing an exercise from the routine does not remove its past workout history.
 - Set and rep ranges are drafts/guidance; they are not enforced during workout entry.
-- The current implementation does not validate blank names, missing bounds, negative values, or minimum values greater than maximum values. See Known Limitations.
+- Routine exercise names may be blank while editing, but a name is required before a workout containing that exercise can be saved.
+- Set and rep bounds may be blank. A present bound is stored as a whole number of at least 1.
+- A minimum is never left above its maximum. On load and restore the minimum wins; during routine editing the field just changed wins.
 
 ---
 
@@ -1053,7 +1057,7 @@ Current expected result:
 
 ```text
 ============================================================
-288 passed, 0 failed
+308 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1086,6 +1090,7 @@ The application should:
 14. Protect unsaved drafts when changing the date or weekday.
 15. Reject future dates and invalid date strings.
 16. Give every loaded or restored workout and routine exercise a unique ID.
+17. Require a name for every exercise with completed sets before saving.
 
 Current exceptions to escaping and duplicate-date handling are listed in Known Limitations.
 
@@ -1219,9 +1224,9 @@ Acceptance also requires that malformed stored data does not crash the app and t
 
 ## 15.4 Routine and Validation
 
-- Routine exercise names can be blank.
-- Set and rep bounds can be missing, negative, or inverted.
-- `smin` of zero falls back to three initial sets.
+- Routine exercise names may be blank while editing, but Finish requires a name for every exercise with completed sets.
+- Set and rep bounds may be blank. Present values are normalized to whole numbers of at least 1, and a minimum cannot exceed its maximum.
+- `smin` of zero is treated as blank and falls back to three initial sets.
 - Minimum and maximum sets/reps are guidance only and are not enforced.
 - Routine changes save immediately; there is no explicit save or undo.
 - Deleting a routine exercise has no confirmation.
@@ -1507,7 +1512,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-288 passed, 0 failed
+308 passed, 0 failed
 ```
 
 ---
@@ -1528,7 +1533,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-11-04**.
+- This document describes the current implementation as of **2026-11-06**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.

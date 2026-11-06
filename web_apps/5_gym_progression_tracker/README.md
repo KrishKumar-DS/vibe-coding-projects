@@ -37,6 +37,7 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 - **Copy weight** — `Copy weight to all` copies the first set's weight to every set in that exercise.
 - **Skip / include** — `Skip` grays out an exercise; `Include` brings it back. Skipped exercises are not saved.
 - **Add exercise** — Use the **Add exercise** card at the bottom to append a custom exercise for this session only.
+- **Names** — Finish requires every exercise with completed sets to have a name. Blank routine rows are allowed while editing.
 - **Edit / delete** — From History, `Edit` reopens the saved workout (changes update the original record), and `Delete` asks for confirmation.
 
 Only sets that are ticked **and** have repetitions are saved.
@@ -101,7 +102,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-288 passed, 0 failed
+308 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
