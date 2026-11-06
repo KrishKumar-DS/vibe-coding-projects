@@ -45,12 +45,28 @@ const def = () => ({
 });
 
 
-const num = v => (v === '' || v == null || isNaN(+v)) ? '' : +v;
+const normBound = v => {
+    if (v === '' || v == null) return '';
+    const n = Math.floor(+v);
+    return Number.isFinite(n) && n > 0 ? n : '';
+};
+function normalizeRanges(e) {
+    if (e.smin !== '' && e.smax !== '' && e.smin > e.smax) e.smax = e.smin;
+    if (e.rmin !== '' && e.rmax !== '' && e.rmin > e.rmax) e.rmax = e.rmin;
+}
+function fixEditedRange(e, key) {
+    if (key === 'smin' && e.smin !== '' && e.smax !== '' && e.smin > e.smax) e.smax = e.smin;
+    if (key === 'smax' && e.smax !== '' && e.smin !== '' && e.smax < e.smin) e.smin = e.smax;
+    if (key === 'rmin' && e.rmin !== '' && e.rmax !== '' && e.rmin > e.rmax) e.rmax = e.rmin;
+    if (key === 'rmax' && e.rmax !== '' && e.rmin !== '' && e.rmax < e.rmin) e.rmin = e.rmax;
+}
 function normRoutineEx(e) {
     if (!e || typeof e !== 'object') return null;
     const name = e.n ?? e.name;
     if (!('n' in e) && !('name' in e)) return null;
-    return { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: typeof name === 'string' ? name : '', m: String(e.m ?? e.muscle ?? ''), smin: num(e.smin ?? e.minSets), smax: num(e.smax ?? e.maxSets), rmin: num(e.rmin ?? e.minReps), rmax: num(e.rmax ?? e.maxReps) }
+    const out = { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: typeof name === 'string' ? name : '', m: String(e.m ?? e.muscle ?? ''), smin: normBound(e.smin ?? e.minSets), smax: normBound(e.smax ?? e.maxSets), rmin: normBound(e.rmin ?? e.minReps), rmax: normBound(e.rmax ?? e.maxReps) };
+    normalizeRanges(out);
+    return out
 }
 function normPlan(plan) {
     const out = {};
@@ -119,7 +135,14 @@ function normalizeData(o) {
 }
 function normDraft(d) {
     if (!d || typeof d !== 'object' || !isDate(d.date) || !Array.isArray(d.ex)) return null;
-    return { date: d.date, di: wk(d.date), editId: (typeof d.editId === 'string' && d.editId) ? d.editId : '', base: (typeof d.base === 'string') ? d.base : null, baseDate: isDate(d.baseDate) ? d.baseDate : ((typeof d.base === 'string') ? d.date : ''), ex: d.ex.filter(e => e && typeof e === 'object').map(e => ({ xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: num(e.smin), smax: num(e.smax), rmin: num(e.rmin), rmax: num(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] })) }
+    return {
+        date: d.date, di: wk(d.date), editId: (typeof d.editId === 'string' && d.editId) ? d.editId : '', base: (typeof d.base === 'string') ? d.base : null, baseDate: isDate(d.baseDate) ? d.baseDate : ((typeof d.base === 'string') ? d.date : ''),
+        ex: d.ex.filter(e => e && typeof e === 'object').map(e => {
+            const out = { xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: normBound(e.smin), smax: normBound(e.smax), rmin: normBound(e.rmin), rmax: normBound(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] };
+            normalizeRanges(out);
+            return out
+        })
+    }
 }
 function backfillXids() {
     const byName = {};
@@ -216,8 +239,9 @@ function lastSets(e, date, skip) {
 }
 function mk(e, date, skip) {
     const l = lastSets({ n: e.n, xid: e.id || '' }, date, skip) || [];
-    const c = Math.max(1, +e.smin || 3);
-    return { xid: e.id || '', n: e.n, m: e.m, smin: e.smin || '', smax: e.smax || '', rmin: e.rmin || '', rmax: e.rmax || '', on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
+    const smin = normBound(e.smin), smax = normBound(e.smax), rmin = normBound(e.rmin), rmax = normBound(e.rmax);
+    const c = Math.max(1, smin || 3);
+    return { xid: e.id || '', n: e.n, m: e.m, smin, smax, rmin, rmax, on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
 function newDraft(di, date = today()) { staleDraftNotice = false; D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
 function fromLog(l) {
@@ -397,8 +421,8 @@ function plan_v() {
     p.ex.forEach((e, i) => {
         h += `<div class="card"><div class="hd"><b>Exercise ${i + 1}</b><button class="x" data-a="pdel" data-i="${i}">✕</button></div>
   <div class="pl"><input data-p="n" data-i="${i}" value="${esc(e.n)}" placeholder="Name"><input data-p="m" data-i="${i}" value="${esc(e.m)}" placeholder="Muscle">
-  <input type="number" data-p="smin" data-i="${i}" value="${e.smin}" placeholder="Sets min"><input type="number" data-p="smax" data-i="${i}" value="${e.smax}" placeholder="Sets max">
-  <input type="number" data-p="rmin" data-i="${i}" value="${e.rmin}" placeholder="Reps min"><input type="number" data-p="rmax" data-i="${i}" value="${e.rmax}" placeholder="Reps max"></div></div>`
+  <input type="number" min="1" step="1" data-p="smin" data-i="${i}" value="${e.smin}" placeholder="Sets min"><input type="number" min="1" step="1" data-p="smax" data-i="${i}" value="${e.smax}" placeholder="Sets max">
+  <input type="number" min="1" step="1" data-p="rmin" data-i="${i}" value="${e.rmin}" placeholder="Reps min"><input type="number" min="1" step="1" data-p="rmax" data-i="${i}" value="${e.rmax}" placeholder="Reps max"></div></div>`
     });
     h += `<button class="btn g w" data-a="padd">+ Add exercise to ${DAYS[planDay]}</button>
  <div class="card" style="margin-top:16px"><b>Backup</b><div class="mu">Data is saved in this browser only.</div>
@@ -449,7 +473,9 @@ document.addEventListener('click', async ev => {
         if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
-        const ex = D.ex.filter(e => e.on).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: Math.max(0, +s.w || 0), r: Math.max(1, Math.floor(+s.r) || 1) })) })).filter(e => e.sets.length);
+        const unnamed = D.ex.filter(e => e.on && !String(e.n).trim() && e.sets.some(isCompleted));
+        if (unnamed.length) { alert('Name every exercise with completed sets, or remove it before finishing.'); return }
+        const ex = D.ex.filter(e => e.on && String(e.n).trim()).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: Math.max(0, +s.w || 0), r: Math.max(1, Math.floor(+s.r) || 1) })) })).filter(e => e.sets.length);
         if (!ex.length) { alert('Mark at least one set as completed and enter its repetitions.'); return }
         const date = D.date;
         if (!isDate(date) || date > today()) { alert('Please choose a valid date that is not in the future.'); return }
@@ -519,11 +545,26 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('input', ev => {
     const t = ev.target;
     if (t.dataset.f) { const s = D.ex[+t.dataset.i].sets[+t.dataset.j]; s[t.dataset.f] = t.dataset.f === 'd' ? t.checked : t.value; if (!saveD()) Store.notifyStorageFailure() }
-    else if (t.dataset.p) { const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : t.value === '' ? '' : +t.value; if (!save()) Store.notifyStorageFailure() }
+    else if (t.dataset.p) { const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : normBound(t.value); if (!save()) Store.notifyStorageFailure() }
     else if (t.id === 'pn') { S.plan[planDay].name = t.value; if (!save()) Store.notifyStorageFailure() }
 });
 document.addEventListener('change', ev => {
     if (ev.target.id === 'pk') { pick = ev.target.value; render() }
+    if (ev.target.dataset.p) {
+        const k = ev.target.dataset.p;
+        if (['smin', 'smax', 'rmin', 'rmax'].includes(k)) {
+            const pi = planDay == null ? todayIdx() : planDay;
+            const e = S.plan[pi].ex[+ev.target.dataset.i];
+            e[k] = normBound(ev.target.value);
+            fixEditedRange(e, k);
+            if (!save()) Store.notifyStorageFailure();
+            const pair = { smin: 'smax', smax: 'smin', rmin: 'rmax', rmax: 'rmin' }[k];
+            const pInput = $(`[data-p="${pair}"][data-i="${ev.target.dataset.i}"]`);
+            ev.target.value = e[k];
+            if (pInput) pInput.value = e[pair]
+        }
+        return
+    }
     if (ev.target.id === 'dt') {
         const v = ev.target.value;
         if (!isDate(v)) { render(); return }
