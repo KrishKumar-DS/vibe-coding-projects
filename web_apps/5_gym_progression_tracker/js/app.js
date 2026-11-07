@@ -149,6 +149,32 @@ function backfillXids() {
     Object.values(S.plan).forEach(p => p.ex.forEach(e => { (byName[e.n] = byName[e.n] || new Set()).add(e.id) }));
     S.logs.forEach(l => l.ex.forEach(e => { if (e.xid) return; const ids = byName[e.n]; if (ids && ids.size === 1) e.xid = [...ids][0] }));
 }
+// A draft saved before its generated plan was persisted can reference exercise
+// IDs that no longer exist. Remap only unambiguous name/muscle matches so the
+// same exercise keeps one identity, and repair the baseline so a clean draft
+// stays clean. Unmatched/ambiguous IDs are left alone (a removed routine
+// exercise must keep its identity).
+function remapDraftXids(d) {
+    if (!d) return false;
+    const planEx = Object.values(S.plan).flatMap(p => p.ex);
+    const ids = new Set(planEx.map(e => e.id));
+    let changed = false;
+    const fix = e => {
+        if (!e || typeof e !== 'object' || !e.xid || !e.n || ids.has(e.xid)) return;
+        const byName = planEx.filter(p => p.n === e.n);
+        let matches = e.m ? byName.filter(p => p.m === e.m) : byName;
+        if (matches.length !== 1) matches = byName;
+        if (matches.length === 1) { e.xid = matches[0].id; changed = true }
+    };
+    d.ex.forEach(fix);
+    if (typeof d.base === 'string') {
+        try {
+            const base = JSON.parse(d.base);
+            if (Array.isArray(base)) { base.forEach(fix); d.base = JSON.stringify(base) }
+        } catch (e) { }
+    }
+    return changed
+}
 
 
 function validateBackup(o) {
@@ -181,23 +207,26 @@ function recoverCopy(rawStr, why) {
 }
 function bootState() {
     const rawStr = Store.readRaw('gym_data');
-    if (rawStr == null) return { S: def(), persist: false };
-    let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON'); return { S: def(), persist: false } }
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure'); return { S: def(), persist: false } }
+    if (rawStr == null) return { S: def(), persist: true, generatedPlan: true };
+    let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON'); return { S: def(), persist: false, generatedPlan: true } }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure'); return { S: def(), persist: false, generatedPlan: true } }
     if (!isStrict(raw)) recoverCopy(rawStr, 'missing or malformed fields');
-    return { S: normalizeData(raw), persist: true }
+    return { S: normalizeData(raw), persist: true, generatedPlan: false }
 }
 
 let S, D, tab = 'today', pick = null, planDay = null, lastKnownToday = today(), staleDraftNotice = false;
 const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
-D = normDraft(Store.loadDraft());
 backfillXids();
+if (boot.persist) save(); // persist the plan before any draft can reference its IDs
+D = normDraft(Store.loadDraft());
+if (boot.generatedPlan && D && remapDraftXids(D)) {
+    if (!saveD()) Store.notifyStorageFailure();
+}
 repairDraftEditId();
 staleDraftNotice = !!(D && D.date < today() && draftHasData(D));
 rollCleanDraftToToday();
-if (boot.persist) save();
 
 // Theme persistence (light / dark / system). Applies before first render.
 const THEMES = ['light', 'dark', 'system'];
