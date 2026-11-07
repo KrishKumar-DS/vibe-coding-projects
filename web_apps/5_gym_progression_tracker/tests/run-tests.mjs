@@ -20,7 +20,7 @@ let src =
 src += `
 ;globalThis.__api = {
   normalizeData, validateBackup, bootState, normDraft, normLog, normLogEx,
-  dateForWeekday, isCompleted, draftHasData, isDate, byDate,
+  dateForWeekday, isCompleted, draftHasData, isDate, byDate, remapDraftXids,
   getS: () => S, getD: () => D, getTab: () => tab,
 };`;
 
@@ -1276,6 +1276,75 @@ const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles 
     gym_draft: JSON.stringify(draft),
   }, now: '2026-10-07T12:00:00' });
   eq('a draft with a missing workout is cleared', c.api.getD().editId, '');
+}
+
+// =====================================================================
+section('Bugs.md 19 — first-run plan identity survives reload');
+
+const planIds = c => new Set(Object.values(c.api.getS().plan).flatMap(p => p.ex.map(e => e.id)));
+{
+  const c = app({});
+  ok('first boot persists the default plan', c.store.has('gym_data'));
+  const stored = JSON.parse(c.store.get('gym_data'));
+  eq('stored plan IDs match memory', Object.values(stored.plan).flatMap(p => p.ex.map(e => e.id)), [...planIds(c)]);
+  ok('first-run draft references persisted IDs', c.api.getD().ex.every(e => planIds(c).has(e.xid)));
+}
+{
+  // reload: stored plan + stored draft must keep the same identities
+  const first = app({});
+  const idsBefore = [...planIds(first)];
+  const draftBefore = first.store.get('gym_draft');
+  const second = app({ seed: { gym_data: first.store.get('gym_data'), gym_draft: draftBefore } });
+  eq('reload keeps the plan IDs', [...planIds(second)], idsBefore);
+  ok('reload draft xids still exist in the plan', second.api.getD().ex.every(e => planIds(second).has(e.xid)));
+  ok('reloaded draft is still clean', second.api.draftHasData(second.api.getD()) === false);
+}
+{
+  // upgrade path: only gym_draft survived the old first-run bug
+  const first = app({});
+  const second = app({ seed: { gym_draft: first.store.get('gym_draft') } });
+  ok('draft-only recovery remaps xids to the regenerated plan', second.api.getD().ex.every(e => planIds(second).has(e.xid)));
+  ok('repaired draft stays clean', second.api.draftHasData(second.api.getD()) === false);
+
+  second.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '60' });
+  second.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  second.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  second.fireClick({ a: 'fin' });
+  const log = second.api.getS().logs[0];
+  ok('saved log xid exists in the current plan', planIds(second).has(log.ex[0].xid));
+  second.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...second.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('progress shows one identity for the exercise', opts.length, 1);
+  ok('progress label keeps the exercise name', opts[0][2].includes('Lat Pulldown'));
+}
+{
+  // dirty drafts keep their work (and baseline diff) across the remap
+  const first = app({});
+  const draft = JSON.parse(first.store.get('gym_draft'));
+  draft.ex[0].sets[0].r = '9';
+  const second = app({ seed: { gym_draft: JSON.stringify(draft) } });
+  ok('dirty draft stays dirty after remap', second.api.draftHasData(second.api.getD()) === true);
+  eq('dirty draft keeps its reps', second.api.getD().ex[0].sets[0].r, '9');
+}
+{
+  // a plan loaded from storage is never remapped: removed exercises keep identity
+  const plan = JSON.parse(DEFAULTS).plan;
+  const removed = plan[1].ex[0];
+  plan[1].ex = plan[1].ex.slice(1);
+  const draft = { date: '2026-10-13', di: 1, ex: [{ xid: removed.id, n: removed.n, m: removed.m, smin: removed.smin, smax: removed.smax, rmin: removed.rmin, rmax: removed.rmax, on: true, sets: [] }] };
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [] }), gym_draft: JSON.stringify(draft) } });
+  eq('stored plan leaves a removed-exercise identity alone', c.api.getD().ex[0].xid, removed.id);
+}
+{
+  // ambiguous matches are not guessed
+  const c = app({});
+  c.api.getS().plan[1].ex = [
+    { id: 'amb-a', n: 'Ambiguous Lift', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'amb-b', n: 'Ambiguous Lift', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const d = { ex: [{ xid: 'old', n: 'Ambiguous Lift', m: 'Chest' }], base: null };
+  c.api.remapDraftXids(d);
+  eq('ambiguous orphan xid is left unchanged', d.ex[0].xid, 'old');
 }
 
 // =====================================================================
