@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-06)
+**Date:** 2026-10-27 (last updated 2026-11-07)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **308 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **323 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -23,7 +23,6 @@
 | 15 | P3 | Storage | Boot-time and theme saves fail silently |
 | 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
 | 18 | Tests | Test coverage | Missing regressions for the issues above |
-| 19 | P1 | Exercise identity | First-run plan IDs regenerate on reload, orphaning draft IDs |
 | 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
 | 21 | P2 | Recovery | Structurally invalid data becomes a blank/partial plan, not defaults |
 | 22 | P2 | Import integrity | Validator silently drops malformed log exercises/sets; accepts empty workouts |
@@ -38,11 +37,11 @@
 | 32 | P3 | Storage | Recovery copies accumulate; corrupt drafts are silently discarded |
 | 33 | P3 | Theme UX | Saved theme can flash after first paint |
 
-> Items **19–33** were added in a follow-up review after the original 18. They are numbered separately so the existing references remain stable.
+> Items **20–33** were added in a follow-up review after the original 18. Item **19** was added at the same time and is now resolved. Follow-up items keep their original numbers so existing references remain stable.
 
 ### Recommended patch order
 
-1. Items **19–20** — P1 identity and past-day workflows.
+1. Item **20** — P1 past-day workflow.
 2. Items **10–11** — draft safety and escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Item **18** — regression coverage.
@@ -266,7 +265,7 @@ Also make `recoverCopy()` report whether the recovery write actually succeeded i
 - A failed recovery copy is reported accurately.
 - The warning remains throttled.
 
-> **Follow-up note:** checking the boot save result does not address the first-run case where `boot.persist` is `false` and the default plan is never saved. See item **19**.
+> **Follow-up note:** checking the boot save result does not by itself fix the first-run case where the default plan was never saved. That root cause is fixed separately by item **19**, which now persists the generated plan on first boot.
 
 ---
 
@@ -318,7 +317,7 @@ Add tests for:
 2. Draft and theme injection payloads remain escaped.
 3. Invalid theme values fall back to `system`.
 4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
-5. First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.
+5. ~~First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.~~ Covered by the Bugs.md 19 tests.
 6. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
 7. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
 8. Restore and boot reject future-dated workouts.
@@ -342,48 +341,9 @@ Add tests for:
 
 ---
 
-# Follow-up Review — Additional Bugs (19–33)
+# Follow-up Review — Additional Bugs (20–33)
 
-These findings were added after the original 18. They were reproduced by driving the app's own handlers with fixed dates, so the test suite's existing green status does not cover them.
-
----
-
-## 19. First-run plan IDs change on reload, orphaning the saved draft's identities
-
-**Priority:** P1
-**Where:** `js/app.js:32-39` (`def`), `js/app.js:109-124` (`bootState`/boot), `js/app.js:163` (`newDraft`), `js/app.js:192` (automatic today draft)
-
-### Problem
-
-On a fresh installation, `def()` generates a default plan with random exercise IDs, but `bootState()` returns `persist: false` when `gym_data` is absent. The Today view then immediately creates and saves a draft containing those IDs.
-
-If the user reloads before finishing the workout or editing the Routine, `gym_data` still does not exist, so boot generates a **new default plan with different IDs**. The restored draft still contains the old IDs. Finishing it saves a log whose `xid`s no longer match the current plan. Future workouts use the new IDs, so Progress splits the same exercise into two identities.
-
-### Reproduction
-
-1. Start with no `gym_data` in a fresh browser profile.
-2. Open the app; the Today draft is auto-created and saved.
-3. Reload before finishing or changing the routine.
-4. Complete and save the restored draft.
-5. Log the same exercise again on a later date.
-6. Open Progress.
-
-Result: the saved log `xid` differs from the current plan exercise ID, and Progress shows entries such as `Lat Pulldown · Back` and `Lat Pulldown (2)`.
-
-`backfillXids()` does not repair this because it only fills empty `xid`s; it does not remap non-empty IDs that vanished from the plan.
-
-### Fix
-
-- Persist the default plan on first boot, or persist `S` before saving a draft that references its IDs.
-- Alternatively, reconcile draft/log `xid`s against the current plan when IDs change, and update `D.base` along with the draft.
-- Ensure the fix preserves stable identities across reloads and does not remap intentionally deleted/re-added exercises by name.
-
-### Acceptance
-
-- A first boot followed by a reload keeps plan and draft identities aligned.
-- Finishing a restored first-run draft produces a log whose `xid` exists in the current plan.
-- The same exercise does not split into two Progress entries.
-- The PRD's “stable random IDs” claim and the “do not immediately persist defaults” boot step are reconciled.
+These findings were added after the original 18. They were reproduced by driving the app's own handlers with fixed dates, so the test suite's existing green status did not cover them. Item **19** is now resolved and covered by the `Bugs.md 19` test section.
 
 ---
 
@@ -975,7 +935,7 @@ Commit: `c159345` (README and PRD wording).
 - [x] README accurately describes the recovery fallback.
 - [x] README and the PRD limitations describe the same behavior.
 
-The PRD contradiction between “stable random IDs” and “do not immediately persist defaults” remains tracked under item **19**.
+The PRD contradiction between “stable random IDs” and “do not immediately persist defaults” is resolved: the default plan is now persisted on first boot, and PRD §8.5/§10.3 describe that behavior.
 
 ---
 
@@ -998,11 +958,30 @@ Regression coverage: `tests/run-tests.mjs` section “Draft rollover — reopeni
 
 ---
 
+## 19. First-run plan IDs change on reload, orphaning the saved draft's identities
+
+**Status:** Resolved
+
+### Original problem
+
+On a fresh installation, `def()` generated a default plan with random exercise IDs, but `bootState()` returned `persist: false` when `gym_data` was absent. The Today view then immediately created and saved a draft containing those IDs. Reloading before finishing generated a new default plan with different IDs, so the restored draft's `xid`s no longer matched the plan and Progress split the same exercise into two identities. `backfillXids()` could not repair this because it only fills empty `xid`s.
+
+### Fix
+
+- `bootState()` marks plans generated from defaults and returns `persist: true` for a fresh install, so the default plan is written to `gym_data` on first boot before any draft references its IDs.
+- Boot order now saves the normalized plan before loading or writing a draft.
+- `remapDraftXids()` runs only when the plan was generated from defaults. It remaps an orphaned draft `xid` to a current-plan exercise when the name and muscle (or name alone) match exactly one exercise, and it repairs `D.base` so a clean draft stays clean. Unmatched or ambiguous identities are left unchanged, and a plan loaded from storage is never remapped.
+- The recovery path for invalid JSON still does not overwrite `gym_data`; the draft repair is applied per session.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run plan identity survives reload”.
+
+---
+
 # Verification Checklist
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `308 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `323 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [ ] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -1016,7 +995,7 @@ After applying the fixes, verify:
 - [ ] Native controls follow dark mode.
 - [ ] Storage failures are reported on boot and theme changes.
 - [x] README matches the updated PRD.
-- [ ] First boot followed by reload keeps draft and plan identities aligned.
+- [x] First boot followed by reload keeps draft and plan identities aligned.
 - [ ] After today is saved, a separate past-day workout can be created without moving today's record.
 - [ ] Corrupt/empty `gym_data` does not silently erase the default routine.
 - [ ] Malformed imported exercises/sets are rejected or reported, not silently dropped.

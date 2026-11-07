@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 308 tests as of 2026-11-06
+**Automated Tests:** `node tests/run-tests.mjs` — 323 tests as of 2026-11-07
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -697,7 +697,7 @@ The application does not use URL routing. Reloading the page returns to the Toda
 
 ## 8.5 Default Routine
 
-On a new installation, the application generates a default plan with stable random IDs.
+On a new installation, the application generates a default plan with random IDs and persists it immediately, so the IDs stay stable across reloads.
 
 | Day | Routine name | Exercises |
 |-----|--------------|-----------|
@@ -709,7 +709,7 @@ On a new installation, the application generates a default plan with stable rand
 | Saturday | — | None |
 | Sunday | Rest | None |
 
-The IDs are generated at first boot and are not fixed constants.
+The IDs are generated and persisted at first boot and are not fixed constants.
 
 ---
 
@@ -885,14 +885,15 @@ Only the local adapter exists. No file adapter or backend adapter is implemented
 ## 10.3 Boot and Load Sequence
 
 1. Read `gym_data`.
-2. If no data exists, create defaults and do not immediately persist them.
-3. If the value is invalid JSON or not an object, attempt a recovery copy, alert the user, and load defaults.
-4. If the object is structurally invalid, attempt a recovery copy and alert the user, then normalize and persist the normalized defaults/data.
+2. If no data exists, create defaults and persist them immediately so the generated exercise IDs stay stable across reloads.
+3. If the value is invalid JSON or not an object, attempt a recovery copy, alert the user, and load defaults. The corrupt value is not overwritten.
+4. If the object is structurally invalid, attempt a recovery copy and alert the user, then normalize and persist the normalized data.
 5. If valid, normalize the data and persist the normalized result.
-6. Load and normalize the draft.
-7. Backfill legacy exercise identities.
-8. Save normalized plan and logs when a stored JSON object was present.
-9. Load the theme, defaulting to `system`, and apply it.
+6. Backfill legacy exercise identities in logs.
+7. Save the normalized plan and logs when a stored JSON object was present (first boot persists the defaults from step 2).
+8. Load and normalize the draft.
+9. When the plan was generated from defaults (no stored data, invalid JSON, or a non-object payload), remap orphaned draft exercise identities to the current plan when the name and muscle match exactly one exercise. Repair the draft baseline and save the repaired draft. Unmatched or ambiguous identities are left unchanged.
+10. Load the theme, defaulting to `system`, and apply it.
 
 The result of the boot-time save is not checked or reported.
 
@@ -1057,7 +1058,7 @@ Current expected result:
 
 ```text
 ============================================================
-308 passed, 0 failed
+323 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1216,6 +1217,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Custom-exercise prefill is limited to workouts before the selected draft date.
 - Known routine exercises added during a workout do not create a duplicate Progress entry; unknown name-based exercises may still need a reload before their identity is backfilled.
 - The backfill heuristic only assigns identities when an exercise name maps to exactly one routine identity across the entire plan.
+- If stored workout data is lost while a draft survives, orphaned draft identities are remapped only when the regenerated plan contains exactly one matching exercise by name (and muscle when known); otherwise the old identity is kept.
 - If multiple entries in one workout share the same identity/name, only the first is used by Progression.
 - An exercise removed from the routine remains in history but may keep an old label.
 - The selected Progression exercise is not persisted across reloads.
@@ -1512,7 +1514,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-308 passed, 0 failed
+323 passed, 0 failed
 ```
 
 ---
