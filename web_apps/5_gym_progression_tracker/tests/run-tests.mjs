@@ -105,8 +105,10 @@ const base = app({});
 const DEFAULTS = JSON.stringify(base.api.getS());
 const DIRTY_DRAFT = JSON.stringify({
   date: '2026-10-13', di: 1,
-  ex: [{ xid: 'xd1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10, on: true,
-    sets: [{ w: '60', r: '8', d: true }, { w: '60', r: '8', d: false }, { w: '60', r: '', d: true }] }],
+  ex: [{
+    xid: 'xd1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10, on: true,
+    sets: [{ w: '60', r: '8', d: true }, { w: '60', r: '8', d: false }, { w: '60', r: '', d: true }]
+  }],
 });
 
 // =====================================================================
@@ -189,6 +191,65 @@ section('Bugs 2 & 3 — backup validation + normalization on restore');
   eq('legacy log day derived', l.day, 'Monday');
   eq('legacy log di derived (wk of date)', l.di, 0);
   ok('legacy log has routine name/plan', typeof c.api.getS().plan[0].name === 'string');
+}
+
+// =====================================================================
+section('Bugs.md 10 — restore warns before discarding an unsaved draft');
+const cleanBackup = () => JSON.stringify({
+  plan: { 0: { name: 'Restored Plan', ex: [] } },
+  logs: [{ id: 'r1', date: '2026-10-05', ex: [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }] }],
+});
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.ctl.prompt = cleanBackup();
+  c.fireClick({ a: 'rs' });
+  eq('clean restore -> no discard prompt', c.confirms.length, 0);
+  eq('clean restore replaces the plan', c.api.getS().plan[0].name, 'Restored Plan');
+  eq('clean restore replaces history', c.api.getS().logs.map(l => l.id), ['r1']);
+  ok('clean restore confirms success', c.alerts.some(a => a.includes('Backup restored')));
+  eq('clean restore clears the draft', c.api.getD(), null);
+  eq('clean restore clears stored draft', c.store.get('gym_draft'), 'null');
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
+  const beforeS = JSON.stringify(c.api.getS());
+  const beforeD = JSON.stringify(c.api.getD());
+  const storedS = c.store.get('gym_data');
+  const storedD = c.store.get('gym_draft');
+  c.ctl.prompt = cleanBackup();
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'rs' });
+  eq('dirty restore asks before discarding', c.confirms.length, 1);
+  ok('dirty restore prompt mentions the loss', /unsaved|discard/i.test(c.confirms[0]));
+  eq('cancelled restore leaves plan and history', JSON.stringify(c.api.getS()), beforeS);
+  eq('cancelled restore leaves the draft', JSON.stringify(c.api.getD()), beforeD);
+  eq('cancelled restore does not write data', c.store.get('gym_data'), storedS);
+  eq('cancelled restore does not write the draft', c.store.get('gym_draft'), storedD);
+  ok('cancelled restore has no success message', !c.alerts.some(a => a.includes('Backup restored')));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
+  c.ctl.prompt = cleanBackup();
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'rs' });
+  eq('confirmed dirty restore prompts once', c.confirms.length, 1);
+  eq('confirmed dirty restore replaces history', c.api.getS().logs.map(l => l.id), ['r1']);
+  eq('confirmed dirty restore clears the draft', c.api.getD(), null);
+  eq('confirmed dirty restore clears stored draft', c.store.get('gym_draft'), 'null');
+  eq('confirmed dirty restore returns to history', c.api.getTab(), 'history');
+  ok('confirmed dirty restore reports success', c.alerts.some(a => a.includes('Backup restored')));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
+  const beforeS = JSON.stringify(c.api.getS());
+  const beforeD = JSON.stringify(c.api.getD());
+  c.ctl.prompt = 'not json{';
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'rs' });
+  eq('invalid backup does not ask about the draft', c.confirms.length, 0);
+  eq('invalid backup leaves state untouched', JSON.stringify(c.api.getS()), beforeS);
+  eq('invalid backup leaves the draft untouched', JSON.stringify(c.api.getD()), beforeD);
+  ok('invalid backup still reports invalidity', c.alerts.some(a => a.includes('not valid JSON')));
 }
 
 // =====================================================================
@@ -973,10 +1034,12 @@ const cableFlyLogs = [
 {
   // ambiguous routine names must never be guessed
   const plan = {
-    0: { name: 'Push', ex: [
-      { id: 'bp1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
-      { id: 'bp2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
-    ] },
+    0: {
+      name: 'Push', ex: [
+        { id: 'bp1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+        { id: 'bp2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+      ]
+    },
     1: { name: '', ex: [] },
   };
   const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [] }) } });
@@ -988,10 +1051,12 @@ const cableFlyLogs = [
 section('Bugs.md 8 — target labels show only configured ranges');
 const targetOf = html => (html.match(/<div class="mu">([^<]*)<\/div>/) || [])[1] || '';
 const todayHTML = ranges => app({
-  seed: { gym_data: JSON.stringify({
-    plan: { 1: { name: 'Push', ex: [{ id: 'e1', n: 'Press', m: 'Chest', ...ranges }] } },
-    logs: []
-  }) }
+  seed: {
+    gym_data: JSON.stringify({
+      plan: { 1: { name: 'Push', ex: [{ id: 'e1', n: 'Press', m: 'Chest', ...ranges }] } },
+      logs: []
+    })
+  }
 }).dom.get('#v').innerHTML;
 eq('sets only', targetOf(todayHTML({ smin: 3, smax: 4, rmin: '', rmax: '' })), '3-4 sets');
 eq('reps only', targetOf(todayHTML({ smin: '', smax: '', rmin: 6, rmax: 10 })), '6-10 reps');
@@ -1087,10 +1152,20 @@ const planEx = c => c.api.getS().plan[1].ex[0];
   ok('finish explains the blank name', c.alerts.some(a => /name every exercise/i.test(a)));
 }
 {
-  const c = app({ seed: { gym_data: JSON.stringify({ plan: { 1: { name: 'Push', ex: [
-    { id: 'bn', n: '', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
-    { id: 'ok', n: 'Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }
-  ] } }, logs: [] }) } });
+  const c = app({
+    seed: {
+      gym_data: JSON.stringify({
+        plan: {
+          1: {
+            name: 'Push', ex: [
+              { id: 'bn', n: '', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+              { id: 'ok', n: 'Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }
+            ]
+          }
+        }, logs: []
+      })
+    }
+  });
   c.fireInput({ dataset: { f: 'r', i: '1', j: '0' }, value: '8' });
   c.fireInput({ dataset: { f: 'd', i: '1', j: '0' }, checked: true });
   c.fireClick({ a: 'fin' });
@@ -1205,10 +1280,12 @@ const duplicateData = () => ({ plan: JSON.parse(DEFAULTS).plan, logs: duplicateL
 
 const duplicatePlan = () => {
   const plan = JSON.parse(DEFAULTS).plan;
-  plan[0] = { name: 'Push', ex: [
-    { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
-    { id: 'pid', n: 'Incline DB Press', m: 'Chest', smin: 3, smax: 3, rmin: 8, rmax: 12 },
-  ] };
+  plan[0] = {
+    name: 'Push', ex: [
+      { id: 'pid', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+      { id: 'pid', n: 'Incline DB Press', m: 'Chest', smin: 3, smax: 3, rmin: 8, rmax: 12 },
+    ]
+  };
   return plan;
 };
 const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles = ['Chest', 'Chest']) => [{
@@ -1262,19 +1339,23 @@ const duplicatePlanLogs = (names = ['Bench Press', 'Incline DB Press'], muscles 
 }
 {
   const draft = { date: '2026-10-06', di: 1, editId: 'dup', ex: [] };
-  const c = app({ seed: {
-    gym_data: JSON.stringify(duplicateData()),
-    gym_draft: JSON.stringify(draft),
-  }, now: '2026-10-06T12:00:00' });
+  const c = app({
+    seed: {
+      gym_data: JSON.stringify(duplicateData()),
+      gym_draft: JSON.stringify(draft),
+    }, now: '2026-10-06T12:00:00'
+  });
   const second = c.api.getS().logs.find(l => l.date === '2026-10-06');
   eq('a draft is relinked to the repaired workout', c.api.getD().editId, second.id);
 }
 {
   const draft = { date: '2026-10-07', di: 2, editId: 'ghost', ex: [] };
-  const c = app({ seed: {
-    gym_data: DEFAULTS,
-    gym_draft: JSON.stringify(draft),
-  }, now: '2026-10-07T12:00:00' });
+  const c = app({
+    seed: {
+      gym_data: DEFAULTS,
+      gym_draft: JSON.stringify(draft),
+    }, now: '2026-10-07T12:00:00'
+  });
   eq('a draft with a missing workout is cleared', c.api.getD().editId, '');
 }
 
