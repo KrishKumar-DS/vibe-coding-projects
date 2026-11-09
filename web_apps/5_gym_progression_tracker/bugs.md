@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-09)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **346 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **362 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 11 | P2 | Security | Draft values and the theme label are inserted into HTML unescaped |
 | 12 | P3 | CSS | Disabled future-day chips look enabled |
 | 13 | P3 | CSS | Native controls remain light in dark mode |
 | 14 | P3 | UX | “Log / edit a past day” does not actually choose a past day |
@@ -41,69 +40,11 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day workflow.
-2. Item **11** — escaping.
-3. Items **12–16** — quick UI/reliability improvements.
-4. Item **18** — regression coverage.
-5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
+2. Items **12–16** — quick UI/reliability improvements.
+3. Item **18** — regression coverage.
+4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
----
-
-# Priority 2 — Dead ends, invalid data, and security
-
-## 11. Stored values are inserted into HTML without escaping
-
-**Priority:** P2 (self-XSS hardening)
-**Where:** `js/app.js:204-205`, `js/app.js:297`
-
-### Problem
-
-Two confirmed injection paths through tampered `localStorage`:
-
-- Draft `s.w` / `s.r` are inserted into `value="..."` directly.
-- The theme label is inserted directly into generated HTML.
-
-Example payload for a draft weight:
-
-```text
-"><img src=x onerror=alert(1)>
-```
-
-The generated input breaks out of the attribute and creates an image element.
-
-Example payload for a theme value:
-
-```text
-"><img src=x onerror=alert(2)>
-```
-
-### Fix
-
-Escape both draft values:
-
-```html
-value="${esc(s.w)}"
-value="${esc(s.r)}"
-```
-
-Escape the theme label and validate the stored theme:
-
-```js
-const stored = Store.loadTheme();
-let theme = THEMES.includes(stored) ? stored : 'system';
-```
-
-```js
-Theme: ${esc(themeLabel(theme))}
-```
-
-Make `applyTheme()` fall back to `system` for unrecognized values.
-
-### Acceptance
-
-- Injected HTML remains literal text.
-- Invalid stored themes fall back to `system`.
-- Valid theme labels still render normally.
-- Routine/log names and muscle groups remain escaped.
+Item **11** is resolved and covered by the `Bugs.md 11` tests.
 
 ---
 
@@ -278,8 +219,8 @@ Or use `Map` consistently.
 Add tests for:
 
 1. ~~Restore with a dirty draft prompts and preserves the draft on cancel.~~ Covered by the Bugs.md 10 tests.
-2. Draft and theme injection payloads remain escaped.
-3. Invalid theme values fall back to `system`.
+2. ~~Draft and theme injection payloads remain escaped.~~ Covered by the Bugs.md 11 tests.
+3. ~~Invalid theme values fall back to `system`.~~ Covered by the Bugs.md 11 tests.
 4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
 5. ~~First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.~~ Covered by the Bugs.md 19 tests.
 6. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
@@ -755,6 +696,35 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 11. Stored values are inserted into HTML without escaping
+
+**Status:** Resolved
+
+### Original problem
+
+Two confirmed injection paths through tampered `localStorage`:
+
+- Draft `s.w` / `s.r` were inserted into `value="..."` directly.
+- The stored theme label was inserted into generated HTML without escaping or validating the stored theme.
+
+### Fix
+
+- Draft weights and reps are rendered with `esc()`.
+- Stored themes are validated against `light`, `dark`, and `system`; unrecognized values fall back to `system`.
+- `applyTheme()` normalizes any unknown value to `system`.
+- The theme label is escaped and resolves only to a known label.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 11 — stored draft and theme values are escaped”.
+
+### Acceptance
+
+- [x] Injected HTML remains literal text.
+- [x] Invalid stored themes fall back to `system`.
+- [x] Valid theme labels still render normally.
+- [x] Routine/log names and muscle groups remain escaped.
+
+---
+
 ## 9. Routine names and ranges are not validated
 
 **Status:** Resolved
@@ -975,7 +945,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `346 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `362 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -983,8 +953,8 @@ After applying the fixes, verify:
 - [x] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
 - [x] Blank routine exercises cannot silently enter saved workouts.
 - [x] Routine bounds are whole numbers of at least 1, and minimums cannot exceed maximums.
-- [ ] Injected draft/theme payloads render as text.
-- [ ] Invalid theme values fall back to `system`.
+- [x] Injected draft/theme payloads render as text.
+- [x] Invalid theme values fall back to `system`.
 - [ ] Disabled future-day chips are visually distinct.
 - [ ] Native controls follow dark mode.
 - [ ] Storage failures are reported on boot and theme changes.

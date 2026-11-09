@@ -103,7 +103,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-346 passed, 0 failed
+362 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -151,6 +151,7 @@ If saved data is not valid JSON, the app attempts to keep a recovery copy under 
 - **Manual backups only.** There is no automatic cloud backup.
 - **No accounts or authentication.**
 - **No backend or database.**
+- **Not encrypted.** Data is stored as plain text in `localStorage`. Displayed stored text is HTML-escaped, but there is no Content Security Policy.
 - **No offline guarantee.** There is no service worker, so offline behavior is not guaranteed in a served environment. Because there are no external assets, opening the files locally does not need a network connection.
 - **Limited import validation.** Malformed exercise or set entries inside logs may be dropped, and empty or future-dated workouts can be imported.
 - **Duplicate dates from an import** can make those workouts uneditable until one is moved or deleted.

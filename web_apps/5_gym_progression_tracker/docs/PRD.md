@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 346 tests as of 2026-11-09
+**Automated Tests:** `node tests/run-tests.mjs` — 362 tests as of 2026-11-09
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -895,7 +895,7 @@ Only the local adapter exists. No file adapter or backend adapter is implemented
 7. Save the normalized plan and logs when a stored JSON object was present (first boot persists the defaults from step 2).
 8. Load and normalize the draft.
 9. When the plan was generated from defaults (no stored data, invalid JSON, or a non-object payload), remap orphaned draft exercise identities to the current plan when the name and muscle match exactly one exercise. Repair the draft baseline and save the repaired draft. Unmatched or ambiguous identities are left unchanged.
-10. Load the theme, defaulting to `system`, and apply it.
+10. Load the stored theme, normalize unsupported values to `system`, and apply it.
 
 The result of the boot-time save is not checked or reported.
 
@@ -962,6 +962,7 @@ The interface should prioritize:
 - The user can cycle Light → Dark → System from Routine.
 - The choice persists across visits.
 - The theme is applied to the document root before the first view render.
+- Stored theme values are validated; unsupported values fall back to `system`.
 - Because the scripts are deferred, the saved theme may be applied after the first paint, so a brief flash of the system theme is possible.
 - Native form controls, scrollbars, and date pickers are not explicitly themed with `color-scheme`.
 
@@ -1061,7 +1062,7 @@ Current expected result:
 
 ```text
 ============================================================
-346 passed, 0 failed
+362 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1087,7 +1088,7 @@ The application should:
 7. Confirm destructive workout deletion.
 8. Validate imported backup structure before replacing state.
 9. Normalize loaded and imported data.
-10. Escape user-provided names and muscle groups before inserting them into generated HTML.
+10. Escape user-provided and stored display values (exercise names, muscle groups, draft values, theme labels) before inserting them into generated HTML.
 11. Attempt a recovery copy for unreadable stored data.
 12. Restore previous in-memory state when a workout save, delete, or restore write fails.
 13. Warn the user when storage writes fail.
@@ -1189,7 +1190,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - There is no schema-version field or explicit migration system.
 - The entire state is rewritten on every save, which may become slow with very large histories.
 - Boot-time and theme-save failures are silent.
-- Stored theme values are not validated against the supported set; an unrecognized value is displayed as-is and falls back to the browser's effective light/dark behavior.
+- Stored theme values are validated; an unrecognized value falls back to `system`.
 - The saved theme may not be applied until after the first paint, so a brief flash of the system theme is possible.
 - Recovery copies are not pruned automatically.
 - The recovery alert may claim a copy was kept even if the recovery write failed.
@@ -1265,9 +1266,8 @@ Acceptance also requires that malformed stored data does not crash the app and t
 ## 15.6 Security and Escaping
 
 - Exercise names and muscle groups are escaped for HTML display.
-- Draft weight/repetition values are inserted into input attributes without escaping.
-- The theme label is inserted into generated HTML without escaping.
-- Tampered `localStorage` content can therefore inject HTML (self-XSS).
+- Draft weight/repetition values are escaped before insertion into input attributes.
+- The theme label is escaped, and the stored theme is validated against the supported set.
 - The application has no Content Security Policy.
 - Stored workout data is not encrypted.
 
@@ -1313,7 +1313,6 @@ Short-term improvements that align the implementation more closely with this doc
 - Give custom exercises a stable identity.
 - Fix the custom-exercise range label.
 - Validate routine names and set/rep ranges.
-- Escape draft set values and the theme label.
 - Reject or repair duplicate dates on restore.
 - Add a schema version and migration path.
 - Improve recovery-copy reporting and cleanup.
@@ -1528,7 +1527,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-346 passed, 0 failed
+362 passed, 0 failed
 ```
 
 ---
@@ -1549,7 +1548,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-11-06**.
+- This document describes the current implementation as of **2026-11-09**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.
