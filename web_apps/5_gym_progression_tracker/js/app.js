@@ -549,6 +549,7 @@ document.addEventListener('click', async ev => {
         let o; try { o = JSON.parse(t) } catch (e) { alert('Invalid backup: not valid JSON.'); return }
         const v = validateBackup(o);
         if (!v.ok) { alert('Invalid backup: ' + v.error); return }
+        if (!mayDiscard()) return;
         const prev = S;
         S = normalizeData(o);
         backfillXids();
