@@ -11,7 +11,7 @@ function freshId(used) {
     used.add(id);
     return id
 }
-const themeLabel = t => ({ light: 'Light', dark: 'Dark', system: 'System' }[t] || t);
+const themeLabel = t => t === 'light' ? 'Light' : t === 'dark' ? 'Dark' : 'System';
 
 
 const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
@@ -229,16 +229,19 @@ staleDraftNotice = !!(D && D.date < today() && draftHasData(D));
 rollCleanDraftToToday();
 
 // Theme persistence (light / dark / system). Applies before first render.
+// Validate the stored value so tampered storage cannot reach the theme label,
+// and so an unknown value always resolves to system.
 const THEMES = ['light', 'dark', 'system'];
-let theme = Store.loadTheme() || 'system';
+const storedTheme = Store.loadTheme();
+let theme = THEMES.includes(storedTheme) ? storedTheme : 'system';
 function applyTheme(t) {
-    theme = t;
+    theme = THEMES.includes(t) ? t : 'system';
     const de = document.documentElement;
     if (de) {
-        if (t === 'system') de.removeAttribute('data-theme');
-        else de.dataset.theme = t;
+        if (theme === 'system') de.removeAttribute('data-theme');
+        else de.dataset.theme = theme;
     }
-    Store.saveTheme(t);
+    Store.saveTheme(theme);
 }
 applyTheme(theme);
 
@@ -364,8 +367,8 @@ function today_v() {
         if (e.on) {
             e.sets.forEach((s, j) => {
                 h += `<div class="row"><span class="n">${j + 1}</span>
-   <input type="number" inputmode="decimal" min="0" step="any" placeholder="kg" value="${s.w}" data-f="w" data-i="${i}" data-j="${j}">
-   <input type="number" inputmode="numeric" min="1" step="1" placeholder="${e.rmin ? e.rmin + '-' + e.rmax : 'reps'}" value="${s.r}" data-f="r" data-i="${i}" data-j="${j}">
+   <input type="number" inputmode="decimal" min="0" step="any" placeholder="kg" value="${esc(s.w)}" data-f="w" data-i="${i}" data-j="${j}">
+   <input type="number" inputmode="numeric" min="1" step="1" placeholder="${e.rmin ? e.rmin + '-' + e.rmax : 'reps'}" value="${esc(s.r)}" data-f="r" data-i="${i}" data-j="${j}">
    <input type="checkbox" class="ok" ${s.d ? 'checked' : ''} data-f="d" data-i="${i}" data-j="${j}">
    <button class="x" data-a="ds" data-i="${i}" data-j="${j}">✕</button></div>`
             });
@@ -457,7 +460,7 @@ function plan_v() {
  <div class="card" style="margin-top:16px"><b>Backup</b><div class="mu">Data is saved in this browser only.</div>
  <div class="row"><button class="btn g" data-a="bk">Copy backup</button><button class="btn g" data-a="rs">Restore</button></div></div>
  <div class="card" style="margin-top:10px"><b>Theme</b><div class="mu">Appearance follows your system by default.</div>
- <div class="row"><button class="btn g" data-a="theme">Theme: ${themeLabel(theme)}</button></div></div>`;
+ <div class="row"><button class="btn g" data-a="theme">Theme: ${esc(themeLabel(theme))}</button></div></div>`;
     return h
 }
 
