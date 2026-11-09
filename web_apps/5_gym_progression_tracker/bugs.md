@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-07)
+**Date:** 2026-10-27 (last updated 2026-11-09)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **323 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **346 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 10 | P2 | Draft safety | Restore clears an unsaved draft without warning |
 | 11 | P2 | Security | Draft values and the theme label are inserted into HTML unescaped |
 | 12 | P3 | CSS | Disabled future-day chips look enabled |
 | 13 | P3 | CSS | Native controls remain light in dark mode |
@@ -42,7 +41,7 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day workflow.
-2. Items **10–11** — draft safety and escaping.
+2. Item **11** — escaping.
 3. Items **12–16** — quick UI/reliability improvements.
 4. Item **18** — regression coverage.
 5. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
@@ -50,41 +49,6 @@
 ---
 
 # Priority 2 — Dead ends, invalid data, and security
-
-## 10. Restore clears an unsaved draft without warning
-
-**Priority:** P2
-**Where:** `js/app.js:365`
-
-### Problem
-
-Restore replaces `S`, sets `D = null`, and clears the draft. The paste prompt is explicit, but it does not warn that unsaved workout data is being discarded.
-
-### Reproduction
-
-1. Enter a partial workout.
-2. Go to Routine.
-3. Restore a backup.
-4. Observe that the partial workout is gone.
-
-### Fix
-
-After validation and before replacing state:
-
-```js
-if (!mayDiscard()) return;
-```
-
-Then proceed with normalization and replacement.
-
-### Acceptance
-
-- Restore with a clean draft proceeds.
-- Restore with a dirty draft asks first.
-- Cancelling leaves both the current data and draft unchanged.
-- Confirming performs the replacement.
-
----
 
 ## 11. Stored values are inserted into HTML without escaping
 
@@ -313,7 +277,7 @@ Or use `Map` consistently.
 
 Add tests for:
 
-1. Restore with a dirty draft prompts and preserves the draft on cancel.
+1. ~~Restore with a dirty draft prompts and preserves the draft on cancel.~~ Covered by the Bugs.md 10 tests.
 2. Draft and theme injection payloads remain escaped.
 3. Invalid theme values fall back to `system`.
 4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
@@ -820,6 +784,36 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 9 — routine name
 
 ---
 
+## 10. Restore clears an unsaved draft without warning
+
+**Status:** Resolved
+
+### Original problem
+
+Restore replaced `S`, set `D = null`, and cleared the draft. The paste prompt was explicit, but it did not warn that unsaved workout data was being discarded.
+
+### Fix
+
+The restore handler now checks for unsaved draft data after validating the backup and before replacing state (`js/app.js` restore action):
+
+```js
+if (!mayDiscard()) return;
+```
+
+Invalid backups are rejected before the prompt, so they never ask about discarding the draft. Cancelling leaves the current plan, logs, draft, and stored values untouched. Confirming proceeds with normalization and replacement, and the draft is cleared only after the new state saves successfully.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 10 — restore warns before discarding an unsaved draft”.
+
+### Acceptance
+
+- [x] Restore with a clean draft proceeds.
+- [x] Restore with a dirty draft asks first.
+- [x] Cancelling leaves both the current data and draft unchanged.
+- [x] Confirming performs the replacement.
+- [x] Invalid backups do not trigger the discard prompt.
+
+---
+
 ## 6. Editing a workout across weekdays changes the routine name but not the exercises
 
 **Status:** Resolved
@@ -981,9 +975,9 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `323 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `346 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
-- [ ] Restore with a dirty draft prompts.
+- [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [x] Weekday chips block occupied dates immediately while editing.
 - [x] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.

@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 323 tests as of 2026-11-07
+**Automated Tests:** `node tests/run-tests.mjs` — 346 tests as of 2026-11-09
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -241,7 +241,7 @@ The application shall allow the user to select a workout date.
 - Invalid or cleared dates cause the view to re-render with the last valid date.
 - The workout weekday is derived from the selected date.
 - Selecting a date that already has a saved workout opens that workout for editing.
-- Selecting a date without a saved workout creates a new draft using that date's routine.
+- Selecting a date without a saved workout creates a new draft using that date's routine when no saved workout is being edited. While editing, choosing an empty date moves the workout being edited (see Known Limitations).
 - The application prevents creating a second saved workout on the same date through the UI; duplicate dates can still be introduced by an imported backup.
 - When editing, changing the date to a date occupied by another workout is blocked immediately by the date input and day chips, and again at save time.
 
@@ -310,8 +310,8 @@ Behavior:
 - The user may supply an exercise name and muscle group.
 - If the muscle is blank and the name matches a known exercise, that exercise's muscle is used.
 - If no muscle can be inferred, `Other` is used.
-- Added exercises start with three sets.
-- Added exercises do not receive a stable routine identity.
+- If the name matches exactly one routine exercise, the added exercise reuses that exercise's stable identity, muscle group, and target ranges, and starts with its planned minimum sets (or three when unset).
+- Otherwise, the added exercise starts with three sets and has no stable routine identity.
 
 ---
 
@@ -420,10 +420,10 @@ Identity and grouping:
 
 - Log exercises with a stable `xid` are grouped by that identity.
 - Legacy exercises without `xid` are grouped by name.
-- If the identity still exists in the routine, the current routine name is preferred as the label.
+- If the identity still exists in the routine, the current routine name is preferred as the label. A blank current name is also preferred, which can produce a blank label (see Known Limitations).
 - Otherwise, the most recent recorded name is used.
 - Duplicate labels are disambiguated by appending the muscle group.
-- If labels are still duplicated, numeric suffixes such as `(2)` and `(3)` are added.
+- If labels are still duplicated, numeric suffixes such as `(2)` and `(3)` are added. The current suffix fallback rebuilds from the base label, so a muscle-disambiguated label can lose its muscle context (see Known Limitations).
 - Exercises with no recorded sets are excluded.
 
 Per-session calculation:
@@ -523,6 +523,7 @@ While a workout is being entered, the current draft shall be stored separately f
 - A clean draft left on an earlier day is replaced by a draft for today on boot.
 - A draft for a past date with unsaved work keeps its date and is flagged in the Today view with a **Start today** action.
 - A successful workout save clears the draft.
+- Restoring a backup prompts before discarding a draft with unsaved changes; cancelling leaves the current state and draft untouched.
 - A completed or updated workout does not appear in history until Finish/Update is pressed.
 
 Draft baseline:
@@ -561,14 +562,15 @@ The application shall:
 1. Parse the pasted text as JSON.
 2. Reject invalid JSON with a message.
 3. Validate that the object contains a `plan` object and a `logs` array.
-4. Validate plan entries and workout entries structurally.
-5. Reject malformed backups without changing current state.
+4. Validate plan entries and top-level workout entries structurally.
+5. Reject backups that fail structural validation without changing current state. Malformed log exercises or set entries inside otherwise valid workouts may be dropped during normalization; see Known Limitations.
 6. Normalize the imported data to the current data model; missing plan days become empty routines.
 7. Backfill legacy exercise identities when unambiguous.
 8. Replace the current plan and logs.
 9. Leave the current theme unchanged.
-10. Clear the current draft.
-11. Return to History and confirm success.
+10. If the draft contains unsaved changes, ask for confirmation before clearing it; cancelling leaves the current plan, logs, and draft unchanged.
+11. Clear the draft.
+12. Return to History and confirm success.
 
 If saving the restored state fails, the previous in-memory state is restored and an error is shown.
 
@@ -831,7 +833,7 @@ The theme is stored separately from `S` and `D`.
 - Duplicate routine exercise IDs are replaced during normalization; the first exercise with that ID keeps it.
 - Logs that used a duplicated `xid` are moved to the matching routine exercise only when name and muscle identify exactly one match; otherwise the exercise stays name-based.
 - Ambiguous names remain name-based.
-- Custom exercises added during a workout currently receive an empty `xid`.
+- Custom exercises added during a workout reuse the matching routine identity when the name maps unambiguously to one routine exercise; otherwise they receive an empty `xid` and stay name-based.
 
 ## 9.7 Legacy and Normalization Rules
 
@@ -913,7 +915,7 @@ The result of the boot-time save is not checked or reported.
 - The user is alerted.
 - If the recovery write itself fails, the alert still states that a copy was kept.
 - Recovery copies are not automatically pruned.
-- A malformed draft is ignored; a fresh draft for the current date is created when the Today view renders.
+- A malformed draft is silently replaced by a fresh draft for the current date when the Today view renders; no warning is shown.
 
 ## 10.6 Draft Persistence
 
@@ -960,6 +962,7 @@ The interface should prioritize:
 - The user can cycle Light → Dark → System from Routine.
 - The choice persists across visits.
 - The theme is applied to the document root before the first view render.
+- Because the scripts are deferred, the saved theme may be applied after the first paint, so a brief flash of the system theme is possible.
 - Native form controls, scrollbars, and date pickers are not explicitly themed with `color-scheme`.
 
 ## 11.4 Date and Day Controls
@@ -1058,7 +1061,7 @@ Current expected result:
 
 ```text
 ============================================================
-323 passed, 0 failed
+346 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1187,25 +1190,29 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - The entire state is rewritten on every save, which may become slow with very large histories.
 - Boot-time and theme-save failures are silent.
 - Stored theme values are not validated against the supported set; an unrecognized value is displayed as-is and falls back to the browser's effective light/dark behavior.
+- The saved theme may not be applied until after the first paint, so a brief flash of the system theme is possible.
 - Recovery copies are not pruned automatically.
 - The recovery alert may claim a copy was kept even if the recovery write failed.
+- A corrupt draft is silently discarded and replaced; no warning is shown.
 - Opening the app through `file://` can restrict persistence or clipboard behavior depending on the browser.
 - There is no service worker or installable offline package.
 
 ## 15.2 Workout and Draft
 
 - Only one workout can be created per date through the UI; imported backups may contain duplicate dates.
+- Duplicate dates from an imported backup make both records uneditable until one is moved or deleted.
 - A set requires both a completed checkbox and repetitions to be saved.
 - A blank weight is stored as `0`.
 - Negative weights are clamped to zero before saving.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
+- After today's workout is saved, Today opens it in edit mode. The History action "+ Log / edit a past day" only switches to Today, and choosing an empty past date moves the edited workout rather than creating a new one.
 - Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
 - History → Edit prompts before replacing an unsaved draft.
 - A draft with unsaved work from an earlier day keeps that date until the user chooses **Start today**.
-- The History action labeled "+ Log / edit a past day" only switches to the Today view; the user must then choose a past date manually.
+- Deleting a workout that is open in the draft with unsaved changes discards those changes after the delete confirmation.
 - If clearing the draft fails after a successful save, the previous draft may reappear after reload.
-- Restore replaces the current state and clears the draft without a separate unsaved-change prompt.
+- Restore replaces the current state and, when the draft has unsaved changes, asks for confirmation before clearing it; cancelling leaves the current state and draft untouched.
 - Skipped exercises and uncompleted sets are not stored and therefore cannot be recovered by editing.
 - There is no undo for deleted workouts, removed exercises, or removed sets.
 
@@ -1219,6 +1226,9 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - The backfill heuristic only assigns identities when an exercise name maps to exactly one routine identity across the entire plan.
 - If stored workout data is lost while a draft survives, orphaned draft identities are remapped only when the regenerated plan contains exactly one matching exercise by name (and muscle when known); otherwise the old identity is kept.
 - If multiple entries in one workout share the same identity/name, only the first is used by Progression.
+- A blank current routine exercise name is preferred over the recorded name, which can leave a blank Progression option.
+- When duplicate labels are still ambiguous, the numeric-suffix fallback can drop the muscle disambiguation, for example `Bench Press (2)`.
+- Editing a legacy log whose name matches multiple routine exercises may assign the first matching identity.
 - An exercise removed from the routine remains in history but may keep an old label.
 - The selected Progression exercise is not persisted across reloads.
 - The chart has no axes, tooltips, or date labels, and labels may overlap with many sessions.
@@ -1228,6 +1238,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 
 - Routine exercise names may be blank while editing, but Finish requires a name for every exercise with completed sets.
 - Set and rep bounds may be blank. Present values are normalized to whole numbers of at least 1, and a minimum cannot exceed its maximum.
+- Set and rep bounds have no documented upper limit; an imported or manually entered very large minimum set count can allocate an unbounded number of sets and freeze the page.
 - `smin` of zero is treated as blank and falls back to three initial sets.
 - Minimum and maximum sets/reps are guidance only and are not enforced.
 - Routine changes save immediately; there is no explicit save or undo.
@@ -1244,7 +1255,10 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Restore accepts duplicate workout IDs but normalization gives each record a unique ID.
 - Restore accepts duplicate routine exercise IDs but normalization gives each exercise a unique ID and repairs history that clearly matches one exercise.
 - Restore repairs an inconsistent `di` value from the workout date.
-- Restore accepts duplicate workout dates.
+- Restore accepts duplicate workout dates; the duplicates can block each other from being edited.
+- Malformed log exercises or set entries may be silently dropped during normalization.
+- Empty workouts are accepted on import and boot.
+- Future-dated workouts are accepted on import and boot; they cannot be updated until the date is changed.
 - Unknown fields in a backup are dropped during normalization.
 - There is no backup schema version.
 
@@ -1514,7 +1528,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-323 passed, 0 failed
+346 passed, 0 failed
 ```
 
 ---

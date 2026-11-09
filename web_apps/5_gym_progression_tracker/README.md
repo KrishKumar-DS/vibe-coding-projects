@@ -73,6 +73,7 @@ The Progress view groups exercise history by a stable exercise identity, so rena
 2. Press **Restore**.
 3. Paste the backup JSON into the prompt.
 4. The app validates the `plan` and `logs` structures before replacing your current state.
+5. If you have an unfinished workout with unsaved changes, the app asks before discarding it. Cancelling leaves your current routine, history, and draft unchanged.
 
 Backups missing the `plan` object or `logs` array are rejected and your current data is left untouched. Malformed exercise or set entries inside a workout log may be dropped during normalization, and an incomplete plan can be normalized to blank or partial routine days; see [Limitations](#limitations).
 
@@ -102,7 +103,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-323 passed, 0 failed
+346 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -152,6 +153,10 @@ If saved data is not valid JSON, the app attempts to keep a recovery copy under 
 - **No backend or database.**
 - **No offline guarantee.** There is no service worker, so offline behavior is not guaranteed in a served environment. Because there are no external assets, opening the files locally does not need a network connection.
 - **Limited import validation.** Malformed exercise or set entries inside logs may be dropped, and empty or future-dated workouts can be imported.
+- **Duplicate dates from an import** can make those workouts uneditable until one is moved or deleted.
+- **Deleting an open workout** with unsaved edits discards those edits after the delete confirmation.
+- **Progress labels** can be blank or lose their muscle context when routine names are blank or duplicated.
+- **Theme flash on load.** The saved theme may briefly flash the system theme before your choice is applied.
 - **Basic analytics.** Progression focuses on top-set weight, estimated 1RM, session count, and workout volume.
 - **No nutrition, body-weight, RPE/RIR, rest timer, or PR detection** in this version.
 
