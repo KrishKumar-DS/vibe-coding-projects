@@ -46,6 +46,14 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
   const alerts = [], confirms = [], prompts = [];
   const ctl = { confirm: true, prompt: null, ...controls };
   const elements = new Map();
+  const docEl = {
+    dataset: {},
+    removedAttributes: [],
+    removeAttribute(name) {
+      this.removedAttributes.push(name);
+      if (name === 'data-theme') delete this.dataset.theme;
+    },
+  };
 
   const sandbox = {
     console,
@@ -62,6 +70,7 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
     confirm: c => { confirms.push(String(c)); return ctl.confirm; },
     prompt: (msg) => { prompts.push(String(msg)); return ctl.prompt; },
     document: {
+      documentElement: docEl,
       querySelector: s => { if (!elements.has(s)) elements.set(s, makeEl()); return elements.get(s); },
       addEventListener: (t, fn) => { (listeners[t] = listeners[t] || []).push(fn); },
     },
@@ -88,7 +97,7 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
   const fireInput = props => { const t = makeEl(props); listeners.input.forEach(fn => fn({ target: t })); };
   const fireChange = props => { const t = makeEl(props); listeners.change.forEach(fn => fn({ target: t })); };
 
-  return { api: sandbox.__api, store, alerts, confirms, prompts, ctl, dom: elements, fireClick, fireInput, fireChange };
+  return { api: sandbox.__api, store, alerts, confirms, prompts, ctl, dom: elements, docEl, fireClick, fireInput, fireChange };
 }
 
 // ---- tiny test runner ----
@@ -250,6 +259,69 @@ const cleanBackup = () => JSON.stringify({
   eq('invalid backup leaves state untouched', JSON.stringify(c.api.getS()), beforeS);
   eq('invalid backup leaves the draft untouched', JSON.stringify(c.api.getD()), beforeD);
   ok('invalid backup still reports invalidity', c.alerts.some(a => a.includes('not valid JSON')));
+}
+
+// =====================================================================
+section('Bugs.md 11 — stored draft and theme values are escaped');
+const INJECT = '"><img src=x onerror=alert(1)>';
+const injectDraft = (field, value) => JSON.stringify({
+  date: '2026-10-13', di: 1, editId: '',
+  ex: [{
+    xid: '', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10, on: true,
+    sets: [{ w: field === 'w' ? value : '60', r: field === 'r' ? value : '8', d: false }],
+  }],
+});
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: injectDraft('w', INJECT) } });
+  const html = c.dom.get('#v').innerHTML;
+  ok('draft weight payload is escaped', html.includes('&quot;&gt;&lt;img') && !html.includes('<img'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: injectDraft('r', INJECT) } });
+  const html = c.dom.get('#v').innerHTML;
+  ok('draft reps payload is escaped', html.includes('&quot;&gt;&lt;img') && !html.includes('<img'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: injectDraft('w', '62.5') } });
+  const html = c.dom.get('#v').innerHTML;
+  ok('normal draft weight still renders', html.includes('value="62.5"'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify(INJECT) } });
+  eq('invalid stored theme is rewritten to system', c.store.get('gym_theme'), JSON.stringify('system'));
+  eq('invalid theme removes data-theme', c.docEl.removedAttributes.includes('data-theme'), true);
+  c.fireClick({ a: 'tab', t: 'routine' });
+  const html = c.dom.get('#v').innerHTML;
+  ok('invalid theme payload never reaches the page', !html.includes('<img') && html.includes('Theme: System'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify('neon') } });
+  eq('unknown stored theme falls back to system', c.store.get('gym_theme'), JSON.stringify('system'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify('dark') } });
+  eq('valid dark theme is kept', c.store.get('gym_theme'), JSON.stringify('dark'));
+  eq('valid dark theme is applied', c.docEl.dataset.theme, 'dark');
+  c.fireClick({ a: 'tab', t: 'routine' });
+  ok('valid dark theme label renders', c.dom.get('#v').innerHTML.includes('Theme: Dark'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify('light') } });
+  eq('valid light theme is applied', c.docEl.dataset.theme, 'light');
+  c.fireClick({ a: 'tab', t: 'routine' });
+  ok('valid light theme label renders', c.dom.get('#v').innerHTML.includes('Theme: Light'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify('system') } });
+  eq('system theme removes data-theme', c.docEl.removedAttributes.includes('data-theme'), true);
+  c.fireClick({ a: 'tab', t: 'routine' });
+  ok('system theme label renders', c.dom.get('#v').innerHTML.includes('Theme: System'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.fireClick({ a: 'theme' }); // default system -> light
+  eq('theme cycle still starts at light', c.store.get('gym_theme'), JSON.stringify('light'));
+  eq('theme cycle applies light', c.docEl.dataset.theme, 'light');
 }
 
 // =====================================================================
