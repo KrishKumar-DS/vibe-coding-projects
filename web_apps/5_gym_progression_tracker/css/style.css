@@ -8,7 +8,8 @@
   --ok: #2f9e44;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px)
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light dark
 }
 
 @media (prefers-color-scheme:dark) {
@@ -21,12 +22,17 @@
   }
 }
 
+:root[data-theme="light"] {
+  color-scheme: light
+}
+
 :root[data-theme="dark"] {
   --bg: #101216;
   --card: #1a1d23;
   --tx: #eceef2;
   --mu: #8b93a1;
-  --bd: #2a2e36
+  --bd: #2a2e36;
+  color-scheme: dark
 }
 
 html {
