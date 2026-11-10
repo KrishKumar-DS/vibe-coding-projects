@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-10)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **365 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **368 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 13 | P3 | CSS | Native controls remain light in dark mode |
 | 14 | P3 | UX | “Log / edit a past day” does not actually choose a past day |
 | 15 | P3 | Storage | Boot-time and theme saves fail silently |
 | 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
@@ -39,48 +38,15 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day workflow.
-2. Items **13–16** — quick UI/reliability improvements.
+2. Items **14–16** — quick UI/reliability improvements.
 3. Item **18** — regression coverage.
 4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Items **11** and **12** are resolved and covered by the `Bugs.md 11` and `Bugs.md 12` tests.
+Items **11**, **12**, and **13** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, and `Bugs.md 13` tests.
 
 ---
 
 # Priority 3 — Quick UI and reliability fixes
-
-## 13. Native controls stay light in dark mode
-
-**Priority:** P3
-**Where:** `css/style.css:1-30`
-
-### Problem
-
-Date pickers, selects, and scrollbars do not follow the dark theme because `color-scheme` is not set.
-
-### Fix
-
-```css
-:root {
-    color-scheme: light dark;
-}
-
-:root[data-theme="light"] {
-    color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-    color-scheme: dark;
-}
-```
-
-### Acceptance
-
-- Native controls follow the explicit light/dark theme.
-- System mode follows the OS preference.
-- No visual regression in existing custom controls.
-
----
 
 ## 14. “Log / edit a past day” does not actually choose a past day
 
@@ -210,7 +176,7 @@ Add tests for:
 16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
 17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, and disabled future-day chip markup and styling.
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, and native-control `color-scheme` theming.
 
 ### Acceptance
 
@@ -670,6 +636,45 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 13. Native controls stay light in dark mode
+
+**Status:** Resolved
+
+### Original problem
+
+Date pickers, selects, and scrollbars did not follow the dark theme because `color-scheme` was not set.
+
+### Fix
+
+`css/style.css` now declares the native color scheme for each theme mode:
+
+```css
+:root {
+    color-scheme: light dark
+}
+
+:root[data-theme="light"] {
+    color-scheme: light
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark
+}
+```
+
+The base declaration follows the OS preference, while the explicit theme selectors override it. No JavaScript change was needed because `applyTheme()` already sets and removes `data-theme`.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 13 — native controls follow the light/dark/system theme”.
+
+### Acceptance
+
+- [x] Native controls follow the explicit light/dark theme.
+- [x] System mode follows the OS preference.
+- [x] No visual regression in existing custom controls.
+- [x] The light and dark rules explicitly override the system default.
+
+---
+
 ## 12. Disabled future-day chips look enabled
 
 **Status:** Resolved
@@ -951,7 +956,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `365 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `368 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -962,7 +967,7 @@ After applying the fixes, verify:
 - [x] Injected draft/theme payloads render as text.
 - [x] Invalid theme values fall back to `system`.
 - [x] Disabled future-day chips are visually distinct.
-- [ ] Native controls follow dark mode.
+- [x] Native controls follow dark mode.
 - [ ] Storage failures are reported on boot and theme changes.
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.

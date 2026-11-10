@@ -81,7 +81,7 @@ Backups missing the `plan` object or `logs` array are rejected and your current 
 
 ## Themes
 
-The app follows your operating system's light/dark preference by default.
+The app follows your operating system's light/dark preference by default. Native controls, date pickers, and scrollbars follow the selected appearance.
 
 To override it:
 
@@ -103,7 +103,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-365 passed, 0 failed
+368 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.

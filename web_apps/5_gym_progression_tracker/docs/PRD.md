@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 365 tests as of 2026-11-10
+**Automated Tests:** `node tests/run-tests.mjs` — 368 tests as of 2026-11-10
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -964,7 +964,7 @@ The interface should prioritize:
 - The theme is applied to the document root before the first view render.
 - Stored theme values are validated; unsupported values fall back to `system`.
 - Because the scripts are deferred, the saved theme may be applied after the first paint, so a brief flash of the system theme is possible.
-- Native form controls, scrollbars, and date pickers are not explicitly themed with `color-scheme`.
+- Native form controls, scrollbars, and date pickers follow the selected theme through `color-scheme`.
 
 ## 11.4 Date and Day Controls
 
@@ -1062,7 +1062,7 @@ Current expected result:
 
 ```text
 ============================================================
-365 passed, 0 failed
+368 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1295,7 +1295,6 @@ The application does not currently provide:
 - Inputs rely on placeholders rather than explicit labels.
 - Some icon-only controls have small tap targets.
 - There is no custom focus styling, skip link, or ARIA live region.
-- Native controls are not explicitly themed with `color-scheme`.
 - Emoji rendering varies by platform.
 - Dates are formatted in `en-GB` only.
 - There is no localization or user-configurable unit system.
@@ -1317,7 +1316,7 @@ Short-term improvements that align the implementation more closely with this doc
 - Add a schema version and migration path.
 - Improve recovery-copy reporting and cleanup.
 - Add multi-tab conflict detection.
-- Improve accessibility and native dark-mode control styling.
+- Improve accessibility: labels, focus styles, tap targets, and ARIA live regions.
 
 ## 16.2 Phase 2 — Better Tracking
 
@@ -1527,7 +1526,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-365 passed, 0 failed
+368 passed, 0 failed
 ```
 
 ---
