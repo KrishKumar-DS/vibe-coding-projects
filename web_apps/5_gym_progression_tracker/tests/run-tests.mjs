@@ -751,6 +751,19 @@ section('Bugs.md 12 — disabled future-day chips are visually distinct');
 }
 
 // =====================================================================
+section('Bugs.md 13 — native controls follow the light/dark/system theme');
+{
+  const css = readFileSync(join(__dir, '..', 'css', 'style.css'), 'utf8');
+  const rule = sel => css.match(new RegExp(sel + '\\s*\\{([^}]*)\\}'));
+  const root = rule(':root');
+  const light = rule(':root\\[data-theme="light"\\]');
+  const dark = rule(':root\\[data-theme="dark"\\]');
+  ok('system mode advertises light and dark native controls', !!root && /color-scheme\s*:\s*light dark\b/.test(root[1]));
+  ok('light theme opts into light native controls', !!light && /color-scheme\s*:\s*light\b/.test(light[1]));
+  ok('dark theme opts into dark native controls', !!dark && /color-scheme\s*:\s*dark\b/.test(dark[1]));
+}
+
+// =====================================================================
 section('Draft rollover — reopening on a later day opens today, not the stale draft');
 {
   // clean auto-created draft from Mon 12 Oct, reopened Tue 3 Nov
