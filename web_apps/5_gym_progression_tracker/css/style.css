@@ -110,6 +110,11 @@ h2 {
   white-space: nowrap
 }
 
+.chip:disabled {
+  opacity: .4;
+  cursor: not-allowed
+}
+
 .chip.on {
   background: var(--ac);
   border-color: var(--ac);
