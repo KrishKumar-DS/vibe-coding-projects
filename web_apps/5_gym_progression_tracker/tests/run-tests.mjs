@@ -741,6 +741,16 @@ section('Date selector — future weekdays disabled, correct weekday mapping');
 }
 
 // =====================================================================
+section('Bugs.md 12 — disabled future-day chips are visually distinct');
+{
+  const css = readFileSync(join(__dir, '..', 'css', 'style.css'), 'utf8');
+  const rule = css.match(/\.chip:disabled\s*\{([^}]*)\}/);
+  ok('chip disabled rule exists', !!rule);
+  ok('disabled chips are dimmed', !!rule && /opacity\s*:\s*\.4\b/.test(rule[1]));
+  ok('disabled chips show a not-allowed cursor', !!rule && /cursor\s*:\s*not-allowed\b/.test(rule[1]));
+}
+
+// =====================================================================
 section('Draft rollover — reopening on a later day opens today, not the stale draft');
 {
   // clean auto-created draft from Mon 12 Oct, reopened Tue 3 Nov
