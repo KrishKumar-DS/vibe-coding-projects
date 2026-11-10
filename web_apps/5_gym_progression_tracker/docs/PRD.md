@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 362 tests as of 2026-11-09
+**Automated Tests:** `node tests/run-tests.mjs` — 365 tests as of 2026-11-10
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -971,7 +971,7 @@ The interface should prioritize:
 - The date input uses the browser's native date picker.
 - The date input is capped at today's date.
 - Day chips are horizontally scrollable when needed.
-- Future day chips are disabled.
+- Future day chips are disabled and visually dimmed, with a not-allowed cursor.
 - The current weekday chip is highlighted with the accent color.
 - Changing the date while editing updates the date and weekday index without reloading the routine exercise list or changing the workout's original name.
 
@@ -1062,7 +1062,7 @@ Current expected result:
 
 ```text
 ============================================================
-362 passed, 0 failed
+365 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1527,7 +1527,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-362 passed, 0 failed
+365 passed, 0 failed
 ```
 
 ---
@@ -1548,7 +1548,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-11-09**.
+- This document describes the current implementation as of **2026-11-10**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.

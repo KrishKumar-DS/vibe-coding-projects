@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-09)
+**Date:** 2026-10-27 (last updated 2026-11-10)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **362 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **365 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 12 | P3 | CSS | Disabled future-day chips look enabled |
 | 13 | P3 | CSS | Native controls remain light in dark mode |
 | 14 | P3 | UX | “Log / edit a past day” does not actually choose a past day |
 | 15 | P3 | Storage | Boot-time and theme saves fail silently |
@@ -40,40 +39,15 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day workflow.
-2. Items **12–16** — quick UI/reliability improvements.
+2. Items **13–16** — quick UI/reliability improvements.
 3. Item **18** — regression coverage.
 4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Item **11** is resolved and covered by the `Bugs.md 11` tests.
+Items **11** and **12** are resolved and covered by the `Bugs.md 11` and `Bugs.md 12` tests.
 
 ---
 
 # Priority 3 — Quick UI and reliability fixes
-
-## 12. Disabled future-day chips look enabled
-
-**Priority:** P3
-**Where:** `css/style.css:104-117`
-
-### Problem
-
-The author styles for `.chip` override the browser’s disabled appearance, so future days look clickable even though they are disabled.
-
-### Fix
-
-```css
-.chip:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-}
-```
-
-### Acceptance
-
-- Future day chips are visibly disabled.
-- Existing enabled and selected chip styles are unchanged.
-
----
 
 ## 13. Native controls stay light in dark mode
 
@@ -236,7 +210,7 @@ Add tests for:
 16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
 17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, and disabled future-day chip markup.
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, and disabled future-day chip markup and styling.
 
 ### Acceptance
 
@@ -696,6 +670,38 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 12. Disabled future-day chips look enabled
+
+**Status:** Resolved
+
+### Original problem
+
+The author styles for `.chip` overrode the browser’s disabled appearance, so future days looked clickable even though they were disabled.
+
+### Fix
+
+`css/style.css` now styles the disabled state:
+
+```css
+.chip:disabled {
+    opacity: .4;
+    cursor: not-allowed
+}
+```
+
+No JavaScript change was needed because future-day chips already render with the native `disabled` attribute.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 12 — disabled future-day chips are visually distinct”.
+
+### Acceptance
+
+- [x] Future day chips are visibly disabled.
+- [x] Existing enabled and selected chip styles are unchanged.
+- [x] Disabled chips use a not-allowed cursor.
+- [x] Future-day clicks remain blocked.
+
+---
+
 ## 11. Stored values are inserted into HTML without escaping
 
 **Status:** Resolved
@@ -945,7 +951,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `362 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `365 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -955,7 +961,7 @@ After applying the fixes, verify:
 - [x] Routine bounds are whole numbers of at least 1, and minimums cannot exceed maximums.
 - [x] Injected draft/theme payloads render as text.
 - [x] Invalid theme values fall back to `system`.
-- [ ] Disabled future-day chips are visually distinct.
+- [x] Disabled future-day chips are visually distinct.
 - [ ] Native controls follow dark mode.
 - [ ] Storage failures are reported on boot and theme changes.
 - [x] README matches the updated PRD.

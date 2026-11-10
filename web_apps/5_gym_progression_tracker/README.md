@@ -30,7 +30,7 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 
 ## Logging a Workout
 
-- **Date / day** — Use the date picker or the Mon–Sun chips. Future dates are disabled; past dates are allowed.
+- **Date / day** — Use the date picker or the Mon–Sun chips. Future dates are disabled and dimmed; past dates are allowed.
 - **Reopening on a later day** — An untouched draft from an earlier day is replaced with today's draft. A draft with entered data is kept and marked with **Start today**, so unsaved work is not lost.
 - **Sets** — Enter `kg` and reps for each set. Tick the checkbox to mark a set as completed.
 - **Add / remove sets** — `+ Set` adds a row; `✕` next to a row removes it.
@@ -103,7 +103,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-362 passed, 0 failed
+365 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
