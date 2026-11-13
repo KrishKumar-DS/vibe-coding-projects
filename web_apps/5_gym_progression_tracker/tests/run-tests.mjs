@@ -764,6 +764,94 @@ section('Bugs.md 13 — native controls follow the light/dark/system theme');
 }
 
 // =====================================================================
+section('Bugs.md 14 — History past-day control opens the chosen past date');
+const setPastDate = (c, v) => c.dom.set('#pd', makeEl({ id: 'pd', value: v }));
+{
+  const c = app({});
+  c.fireClick({ a: 'tab', t: 'history' });
+  const html = c.dom.get('#v').innerHTML;
+  ok('history renders a past-date input', html.includes('id="pd"'));
+  ok('past-date input defaults to yesterday and caps at yesterday', html.includes('value="2026-10-12"') && html.includes('max="2026-10-12"'));
+  ok('button label describes the action', html.includes('Log / edit past day'));
+  setPastDate(c, '2026-10-12');
+  c.fireClick({ a: 'past' });
+  eq('empty past date opens that date', c.api.getD().date, '2026-10-12');
+  eq('past draft uses the weekday routine', c.api.getD().di, 0);
+  ok('past draft is a new workout, not an edit', !c.api.getD().editId);
+  eq('past draft shows the Monday routine', c.api.getD().ex.length, c.api.getS().plan[0].ex.length);
+  eq('switches to Today', c.api.getTab(), 'today');
+}
+{
+  // The #20 trap: after today is saved, a past-day entry must not move it.
+  const c = app({});
+  const fillFirstSet = (w, r) => {
+    c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: w });
+    c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: r });
+    c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  };
+  fillFirstSet('60', '8');
+  c.fireClick({ a: 'fin' });
+  const todayId = c.api.getS().logs[0].id;
+  c.fireClick({ a: 'tab', t: 'history' });
+  setPastDate(c, '2026-10-12');
+  c.fireClick({ a: 'past' });
+  ok('past-day entry is not an edit of today', !c.api.getD().editId);
+  fillFirstSet('70', '10');
+  c.fireClick({ a: 'fin' });
+  eq('two separate workouts saved', c.api.getS().logs.map(l => l.date), ['2026-10-12', '2026-10-13']);
+  eq('today record was not moved', c.api.getS().logs.find(l => l.id === todayId).date, '2026-10-13');
+}
+{
+  const existing = { id: 'past1', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'X', ex: [{ n: 'Lat Pulldown', m: 'Back', xid: '', sets: [{ w: 50, r: 10 }] }] };
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [existing] }) } });
+  c.fireClick({ a: 'tab', t: 'history' });
+  setPastDate(c, '2026-10-06');
+  c.fireClick({ a: 'past' });
+  eq('occupied past date opens for editing', c.api.getD().editId, 'past1');
+  eq('edit draft keeps the saved date', c.api.getD().date, '2026-10-06');
+}
+{
+  const c = app({});
+  c.fireClick({ a: 'tab', t: 'history' });
+  for (const v of ['2026-10-13', '2026-10-20', '']) {
+    const label = v || 'blank';
+    c.alerts.length = 0;
+    setPastDate(c, v);
+    c.fireClick({ a: 'past' });
+    ok('rejects ' + label, c.alerts.some(a => /valid date before today/i.test(a)));
+    eq('draft unchanged for ' + label, c.api.getD().date, '2026-10-13');
+    eq('stays on History for ' + label, c.api.getTab(), 'history');
+  }
+}
+{
+  const c = app({});
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  setPastDate(c, '2026-10-12');
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'past' });
+  eq('dirty draft prompts before switching dates', c.confirms.length, 1);
+  eq('cancel keeps the draft date', c.api.getD().date, '2026-10-13');
+  eq('cancel keeps the typed reps', c.api.getD().ex[0].sets[0].r, '9');
+  eq('cancel stays on History', c.api.getTab(), 'history');
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'past' });
+  eq('confirm opens the past date', c.api.getD().date, '2026-10-12');
+  ok('confirm starts a fresh draft', !c.api.getD().editId && c.api.getD().ex[0].sets[0].r === '');
+}
+{
+  const c = app({});
+  c.fireClick({ a: 'day', i: '0' }); // deliberate past-date draft (Mon 12 Oct)
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '7' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  setPastDate(c, '2026-10-12');
+  c.fireClick({ a: 'past' });
+  eq('same-date action skips the discard prompt', c.confirms.length, 0);
+  eq('same-date action keeps the typed reps', c.api.getD().ex[0].sets[0].r, '7');
+  eq('same-date action switches to Today', c.api.getTab(), 'today');
+}
+
+// =====================================================================
 section('Draft rollover — reopening on a later day opens today, not the stale draft');
 {
   // clean auto-created draft from Mon 12 Oct, reopened Tue 3 Nov
