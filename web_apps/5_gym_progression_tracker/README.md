@@ -22,7 +22,7 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 | View | Purpose |
 |------|---------|
 | **Today** | Perform and record the current (or past) workout. Pick a date or weekday, enter sets, skip/remove exercises, add extra exercises. |
-| **History** | Review saved workouts grouped by year. Expand a workout for details, volume, and Edit/Delete actions. |
+| **History** | Review saved workouts grouped by year, start a workout on a past date, and expand a workout for details, volume, and Edit/Delete actions. |
 | **Progress** | Select an exercise to see best weight, estimated 1RM, session count, a top-set weight graph, and recent sessions. |
 | **Routine** | Configure the routine for each day (name, exercises, muscle groups, set/rep ranges). Also contains backup, restore, and theme settings. |
 
@@ -31,6 +31,7 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 ## Logging a Workout
 
 - **Date / day** — Use the date picker or the Mon–Sun chips. Future dates are disabled and dimmed; past dates are allowed.
+- **Past day** — From **History**, pick a past date and press **Log / edit past day**. An empty date starts a new workout for that day; a date with a saved workout opens it for editing.
 - **Reopening on a later day** — An untouched draft from an earlier day is replaced with today's draft. A draft with entered data is kept and marked with **Start today**, so unsaved work is not lost.
 - **Sets** — Enter `kg` and reps for each set. Tick the checkbox to mark a set as completed.
 - **Add / remove sets** — `+ Set` adds a row; `✕` next to a row removes it.
@@ -103,7 +104,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-368 passed, 0 failed
+399 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.

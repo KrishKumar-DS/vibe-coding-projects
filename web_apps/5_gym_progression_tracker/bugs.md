@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-10)
+**Date:** 2026-10-27 (last updated 2026-11-13)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **368 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **399 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 14 | P3 | UX | “Log / edit a past day” does not actually choose a past day |
 | 15 | P3 | Storage | Boot-time and theme saves fail silently |
 | 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
 | 18 | Tests | Test coverage | Missing regressions for the issues above |
@@ -37,47 +36,16 @@
 
 ### Recommended patch order
 
-1. Item **20** — P1 past-day workflow.
-2. Items **14–16** — quick UI/reliability improvements.
+1. Item **20** — P1 past-day edit workflow.
+2. Items **15–16** — quick reliability improvements.
 3. Item **18** — regression coverage.
 4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Items **11**, **12**, and **13** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, and `Bugs.md 13` tests.
+Items **11**, **12**, **13**, and **14** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, and `Bugs.md 14` tests.
 
 ---
 
 # Priority 3 — Quick UI and reliability fixes
-
-## 14. “Log / edit a past day” does not actually choose a past day
-
-**Priority:** P3
-**Where:** `js/app.js:222`, `js/app.js:343`
-
-### Problem
-
-The History button only switches to the Today view. It shows whatever draft is already there, which is usually today’s draft.
-
-### Fix
-
-Immediate low-risk option: relabel it to **“Go to Today”**.
-
-If a real past-day flow is desired:
-
-```js
-else if (a === 'past') {
-    if (!mayDiscard()) { render(); return; }
-    // Prompt for or choose a past date, then openDate(date)
-    tab = 'today';
-}
-```
-
-### Acceptance
-
-- The button label matches its behavior.
-- Or: the button actually opens a past-date entry flow.
-- Dirty drafts are protected.
-
----
 
 ## 15. Boot-time and theme saves fail silently
 
@@ -175,8 +143,9 @@ Add tests for:
 15. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
 16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
 17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+18. ~~The History past-day control opens the chosen date as a new workout without moving an existing record.~~ Covered by the Bugs.md 14 tests.
 
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, and native-control `color-scheme` theming.
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, and the History past-day control.
 
 ### Acceptance
 
@@ -192,39 +161,39 @@ These findings were added after the original 18. They were reproduced by driving
 
 ---
 
-## 20. After today is saved, choosing a past day moves today's workout; there is no new-past-workout path
+## 20. Changing the date while editing still moves the saved workout; there is no Cancel Edit path
 
 **Priority:** P1
-**Where:** `js/app.js:192` (`openDate(today())`), `js/app.js:175` (`openDate`), `js/app.js:382-392` (date input), `js/app.js:311-317` (weekday chips), `js/app.js:332-338` (record ID/date update), `js/app.js:343` (`past`)
+**Where:** `js/app.js` — `openDate()`, the weekday-chip handler (`a === 'day'`), the date-input change handler (`id === 'dt'`), and Finish (`a === 'fin'`)
 
 ### Problem
 
-Once today has a saved workout, opening Today auto-loads that workout as an edit draft (`D.editId` is set). The History button “Log / edit a past day” only switches to Today. If the user then picks an empty past date, the app is still in edit mode, so it changes the existing workout's date instead of creating a new one. Finish updates/moves the original record.
+Once today has a saved workout, opening Today auto-loads that workout as an edit draft (`D.editId` is set). The History past-day control now starts a separate draft (fixed by item **14**), so the “no reachable past-workout entry point” half of this bug is resolved.
+
+What remains: once Today is in edit mode, choosing another date with the date picker or weekday chips still changes the existing record's date directly, with no explicit move/start-new choice and no warning. Finish then updates the original record at the new date instead of creating a new workout, and there is still no way to abandon an edit without moving or deleting the record.
 
 ### Reproduction
 
 1. Save today's workout.
-2. Click **History → + Log / edit a past day**.
-3. Choose an empty past date, such as last Monday.
-4. Enter data and press **Update**.
+2. Open Today; it auto-loads today's workout in edit mode.
+3. Choose an empty past date with the date picker or weekday chips.
+4. Press **Update**.
 
-Result: today's workout is moved to Monday. No new Monday workout is created, and no warning is shown. I verified the saved record keeps its original ID but changes date.
-
-This is related to item **14**, but it is more severe than a mislabeled button: while today's workout exists, the UI has no reachable state for starting a new workout on a past date. Relabeling the button to “Go to Today” would leave that workflow broken, and the date picker/chips still move the existing workout.
+Result: today's workout is moved to the chosen date. No new workout is created, no move-specific warning is shown, and there is no Cancel Edit action.
 
 ### Fix
 
-- Add an explicit **Start new workout / Log past day** flow that clears `editId` and calls `newDraft()`/`openDate()` after `mayDiscard()`.
-- In edit mode, distinguish “move this workout” from “start/open another workout”; make date changes explicit.
+- In edit mode, distinguish “move this workout” from “start/open another workout”; make the date change explicit.
+- Warn before any destructive date move, or offer “start a new workout on this date instead”.
 - Add a Cancel Edit action so an edit can be abandoned without moving or deleting the record.
-- Update the #14 fix so it creates a new draft rather than only switching tabs.
+- Keep the History past-day flow added by item **14**; it already creates a new draft and must not regress.
 
 ### Acceptance
 
-- After saving today's workout, the user can create a separate workout on a past date.
-- Choosing a past date during an edit does not silently move today's record.
+- Choosing a past date during an edit does not silently move the existing record.
 - The user is warned before any destructive date move.
 - There is a clear cancel path for an edit.
+- The History past-day control continues to create a separate workout.
 
 ---
 
@@ -636,6 +605,40 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 14. “Log / edit a past day” did not choose a past day
+
+**Status:** Resolved
+
+### Original problem
+
+The History button only switched to the Today view. It showed whatever draft was already there, usually today's draft, and there was no way to choose a past date from History.
+
+### Fix
+
+The History view now contains a past-date control:
+
+- A native date input (`#pd`) defaults to yesterday and is capped at yesterday.
+- **Log / edit past day** validates that the chosen date is a real date before today.
+- An empty past date starts a new draft for that date (`openDate()` → `newDraft()`), so it is not an edit and cannot move another record.
+- A past date with a saved workout opens that workout for editing.
+- A dirty draft is protected by the existing `mayDiscard()` confirmation.
+- Re-selecting the date already open in the draft keeps the draft instead of resetting it.
+
+The date fields in `js/app.js` now use a shared `shiftDate()` helper, and the Today date picker/day-chip behavior is unchanged.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 14 — History past-day control opens the chosen past date”.
+
+### Acceptance
+
+- [x] The control label matches its behavior.
+- [x] The control opens the chosen past date.
+- [x] An empty past date creates a new workout rather than moving an existing one.
+- [x] A past date with a saved workout opens it for editing.
+- [x] Dirty drafts are protected.
+- [x] Today, future, and blank dates are rejected without changing the draft.
+
+---
+
 ## 13. Native controls stay light in dark mode
 
 **Status:** Resolved
@@ -956,7 +959,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `368 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `399 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -971,7 +974,8 @@ After applying the fixes, verify:
 - [ ] Storage failures are reported on boot and theme changes.
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.
-- [ ] After today is saved, a separate past-day workout can be created without moving today's record.
+- [x] The History past-day control opens the chosen past date without moving an existing workout.
+- [ ] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record.
 - [ ] Corrupt/empty `gym_data` does not silently erase the default routine.
 - [ ] Malformed imported exercises/sets are rejected or reported, not silently dropped.
 - [ ] Future-dated workouts cannot enter through restore or boot.

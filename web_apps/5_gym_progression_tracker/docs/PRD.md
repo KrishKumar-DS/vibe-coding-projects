@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 368 tests as of 2026-11-10
+**Automated Tests:** `node tests/run-tests.mjs` — 399 tests as of 2026-11-13
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -245,6 +245,15 @@ The application shall allow the user to select a workout date.
 - The application prevents creating a second saved workout on the same date through the UI; duplicate dates can still be introduced by an imported backup.
 - When editing, changing the date to a date occupied by another workout is blocked immediately by the date input and day chips, and again at save time.
 
+The History view also provides a past-date control:
+
+- The date input defaults to yesterday and is capped at yesterday.
+- A blank, today, or future date is rejected with a message.
+- An empty past date starts a new draft for that date and does not enter edit mode.
+- A past date with a saved workout opens that workout for editing.
+- A dirty draft is protected by the unsaved-changes confirmation before the draft is replaced.
+- Selecting the date already open in the draft keeps the current draft.
+
 ---
 
 ## FR-03 — Exercise Display and Previous Performance
@@ -390,6 +399,7 @@ The History view shall display:
 - Total training volume.
 - Expandable exercise and set details.
 - Edit and Delete actions.
+- A past-date control: an empty date starts a new workout, and an occupied date opens that workout for editing.
 
 Grouping and ordering:
 
@@ -647,7 +657,7 @@ Responsibilities:
 - Expand workout details.
 - Edit workouts.
 - Delete workouts.
-- Navigate to workout entry.
+- Start a workout on a chosen past date.
 
 ### Progress
 
@@ -974,6 +984,7 @@ The interface should prioritize:
 - Future day chips are disabled and visually dimmed, with a not-allowed cursor.
 - The current weekday chip is highlighted with the accent color.
 - Changing the date while editing updates the date and weekday index without reloading the routine exercise list or changing the workout's original name.
+- The History past-date input is a native date control that defaults to yesterday and cannot select today or a future date.
 
 ## 11.5 Feedback and Confirmations
 
@@ -1055,14 +1066,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
+- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, History past-day entry, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-368 passed, 0 failed
+399 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1207,7 +1218,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Negative weights are clamped to zero before saving.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
-- After today's workout is saved, Today opens it in edit mode. The History action "+ Log / edit a past day" only switches to Today, and choosing an empty past date moves the edited workout rather than creating a new one.
+- After today's workout is saved, Today opens it in edit mode. Use History → past day to start a separate workout on another date. Changing the date while already editing still moves the edited record, and there is no Cancel Edit action.
 - Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
 - History → Edit prompts before replacing an unsaved draft.
 - A draft with unsaved work from an earlier day keeps that date until the user chooses **Start today**.
@@ -1481,6 +1492,7 @@ The developer can explain:
 - [x] Workout editing
 - [x] Workout deletion with confirmation
 - [x] Past workout logging
+- [x] Past-day workout entry from History
 - [x] Workout history grouped by year
 - [x] Training-volume calculation
 - [x] Exercise progression
@@ -1526,7 +1538,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-368 passed, 0 failed
+399 passed, 0 failed
 ```
 
 ---
