@@ -31,6 +31,13 @@ function dateForWeekday(idx, refDate) {
     const d = new Date(ref); d.setDate(ref.getDate() + (idx - cur));
     return iso(d)
 }
+// Shift a YYYY-MM-DD date by whole days using local midnight (DST-safe).
+function shiftDate(date, days) {
+    const d = new Date((isDate(date) ? date : today()) + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return iso(d)
+}
+const yesterday = () => shiftDate(today(), -1);
 const isCompleted = s => !!s && s.d === true && +s.r > 0;
 
 
@@ -385,8 +392,9 @@ function today_v() {
 }
 
 function hist_v() {
-    let h = '<h2>History</h2><button class="btn g w" data-a="past" style="margin-bottom:10px">+ Log / edit a past day</button>';
-    if (!S.logs.length) return h + '<div class="mu">No workouts saved yet.</div>';
+    let h = `<h2>History</h2><div class="card"><b>Past workout</b><div class="mu">Open a past date to log a new workout or edit an existing one.</div>
+ <div class="row"><input type="date" id="pd" aria-label="Past workout date" value="${yesterday()}" max="${yesterday()}"><button class="btn g" data-a="past">Log / edit past day</button></div></div>`;
+    if (!S.logs.length) return h + '<div class="mu" style="margin-top:12px">No workouts saved yet.</div>';
     [...new Set(S.logs.map(l => l.year))].sort((a, b) => b - a).forEach(y => {
         const ls = S.logs.filter(l => l.year === y).reverse();
         h += `<h3 style="margin:14px 0 8px">${y} <span class="mu">${ls.length} workouts</span></h3>`;
@@ -534,7 +542,16 @@ document.addEventListener('click', async ev => {
         if (!mayDiscard()) { render(); return }
         openDate(today()); tab = 'today'
     }
-    else if (a === 'past') { tab = 'today' }
+    else if (a === 'past') {
+        const v = ($('#pd') || {}).value;
+        if (!isDate(v) || v >= today()) { alert('Choose a valid date before today.'); render(); return }
+        // Re-selecting the current date must not reset a draft the user is editing.
+        if (!D || v !== D.date) {
+            if (!mayDiscard()) { render(); return }
+            openDate(v)
+        }
+        tab = 'today'
+    }
     else if (a === 'dl') {
         if (confirm('Delete this workout?')) {
             const prev = S.logs;
