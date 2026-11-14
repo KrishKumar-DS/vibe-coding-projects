@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-13)
+**Date:** 2026-10-27 (last updated 2026-11-14)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **399 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **424 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 15 | P3 | Storage | Boot-time and theme saves fail silently |
 | 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
 | 18 | Tests | Test coverage | Missing regressions for the issues above |
 | 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
@@ -37,50 +36,15 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day edit workflow.
-2. Items **15–16** — quick reliability improvements.
+2. Item **16** — quick reliability improvements.
 3. Item **18** — regression coverage.
 4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Items **11**, **12**, **13**, and **14** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, and `Bugs.md 14` tests.
+Items **11**, **12**, **13**, **14**, and **15** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, `Bugs.md 14`, and `Bugs.md 15` tests.
 
 ---
 
 # Priority 3 — Quick UI and reliability fixes
-
-## 15. Boot-time and theme saves fail silently
-
-**Priority:** P3
-**Where:** `js/app.js:124`, `js/app.js:138`
-
-### Problem
-
-The initial normalized-data save and theme save return a boolean, but the result is ignored. If storage is blocked or full, the app appears to work until a later edit fails.
-
-### Fix
-
-Check the return values:
-
-```js
-if (boot.persist && !save()) Store.notifyStorageFailure();
-```
-
-```js
-if (!Store.saveTheme(t)) Store.notifyStorageFailure();
-```
-
-Also make `recoverCopy()` report whether the recovery write actually succeeded instead of always saying a copy was kept.
-
-### Acceptance
-
-- A blocked initial save produces a warning.
-- A failed theme save produces a warning.
-- A successful recovery copy is reported accurately.
-- A failed recovery copy is reported accurately.
-- The warning remains throttled.
-
-> **Follow-up note:** checking the boot save result does not by itself fix the first-run case where the default plan was never saved. That root cause is fixed separately by item **19**, which now persists the generated plan on first boot.
-
----
 
 ## 16. Plain-object maps can collide with prototype keys
 
@@ -145,7 +109,7 @@ Add tests for:
 17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
 18. ~~The History past-day control opens the chosen date as a new workout without moving an existing record.~~ Covered by the Bugs.md 14 tests.
 
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, and the History past-day control.
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, the History past-day control, boot/theme storage-failure warnings, and accurate recovery-copy reporting.
 
 ### Acceptance
 
@@ -605,6 +569,35 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 15. Boot-time and theme saves fail silently
+
+**Status:** Resolved
+
+### Original problem
+
+The initial normalized-data save and theme save returned a boolean, but the result was ignored. If storage was blocked or full, the app appeared to work until a later edit failed. The recovery-copy alert also always claimed that a copy had been kept.
+
+### Fix
+
+- `bootState()` now checks the boot save result and calls `Store.notifyStorageFailure()` on failure.
+- `applyTheme()` now checks `Store.saveTheme()` and warns on failure.
+- `recoverCopy()` reports whether the recovery key was actually written.
+- Boot-time normalization and theme save failures share the existing throttled warning.
+- Recovery messages distinguish a copy that was kept from one that could not be saved.
+- A structural recovery alert now says the readable parts were normalized instead of claiming defaults were loaded.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 15 — boot, theme, and recovery storage failures are reported”.
+
+### Acceptance
+
+- [x] A blocked initial save produces a warning.
+- [x] A failed theme save produces a warning.
+- [x] A successful recovery copy is reported accurately.
+- [x] A failed recovery copy is reported accurately.
+- [x] The warning remains throttled until a later successful write.
+
+---
+
 ## 14. “Log / edit a past day” did not choose a past day
 
 **Status:** Resolved
@@ -959,7 +952,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `399 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `424 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -971,7 +964,7 @@ After applying the fixes, verify:
 - [x] Invalid theme values fall back to `system`.
 - [x] Disabled future-day chips are visually distinct.
 - [x] Native controls follow dark mode.
-- [ ] Storage failures are reported on boot and theme changes.
+- [x] Storage failures are reported on boot and theme changes.
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.
 - [x] The History past-day control opens the chosen past date without moving an existing workout.

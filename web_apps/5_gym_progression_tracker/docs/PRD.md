@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 399 tests as of 2026-11-13
+**Automated Tests:** `node tests/run-tests.mjs` — 424 tests as of 2026-11-14
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -518,7 +518,7 @@ Behavior:
 - Log workout days, years, and weekday indexes are derived from dates.
 - Logs are sorted by date ascending internally.
 - The normalized plan and logs are saved back after normalization when a stored JSON object was present; absent or unparseable data is not immediately overwritten.
-- If storage writes fail, the user is warned once until a subsequent successful write.
+- If storage writes fail, the user is warned once until a subsequent successful write. This includes the boot-time normalization save and theme writes.
 - The application does not coordinate between multiple open tabs; the last tab to write wins.
 - If stored data is unreadable, a recovery copy is attempted before defaults are used. See Section 10.5.
 
@@ -605,6 +605,7 @@ Behavior:
 - The stored theme is applied before the first view render.
 - The default theme is `system`.
 - The theme is saved when applied, including on boot.
+- If saving the theme fails, the throttled storage warning is shown.
 
 ---
 
@@ -905,9 +906,9 @@ Only the local adapter exists. No file adapter or backend adapter is implemented
 7. Save the normalized plan and logs when a stored JSON object was present (first boot persists the defaults from step 2).
 8. Load and normalize the draft.
 9. When the plan was generated from defaults (no stored data, invalid JSON, or a non-object payload), remap orphaned draft exercise identities to the current plan when the name and muscle match exactly one exercise. Repair the draft baseline and save the repaired draft. Unmatched or ambiguous identities are left unchanged.
-10. Load the stored theme, normalize unsupported values to `system`, and apply it.
+10. Load the stored theme, normalize unsupported values to `system`, apply it, and save it. A failed theme save is reported through the throttled storage warning.
 
-The result of the boot-time save is not checked or reported.
+Boot-time save failures, including theme writes, are reported through the throttled storage warning.
 
 ## 10.4 Save Behavior and Failure Handling
 
@@ -915,7 +916,7 @@ The result of the boot-time save is not checked or reported.
 - Workout save, delete, and restore restore their previous in-memory state when the write fails.
 - Routine edits and per-keystroke draft edits remain in memory after a write failure but are not persisted.
 - A storage failure warning is shown at most once until a subsequent write succeeds.
-- The initial boot save and theme save failures are silent.
+- Boot-time normalization and theme save failures are reported through the same throttled warning.
 - The application does not handle `storage` events or coordinate writes between tabs.
 
 ## 10.5 Recovery
@@ -923,7 +924,7 @@ The result of the boot-time save is not checked or reported.
 - Malformed or structurally invalid `gym_data` triggers an attempted recovery copy.
 - The raw stored string is written to `gym_data_recovery_<timestamp>`.
 - The user is alerted.
-- If the recovery write itself fails, the alert still states that a copy was kept.
+- The alert states whether the recovery copy was kept or could not be saved.
 - Recovery copies are not automatically pruned.
 - A malformed draft is silently replaced by a fresh draft for the current date when the Today view renders; no warning is shown.
 
@@ -1066,14 +1067,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, History past-day entry, date/weekday mapping, stable exercise identity, storage failures, progression grouping, and regression flows.
+- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, History past-day entry, date/weekday mapping, stable exercise identity, storage failures (including boot, theme, and recovery-copy reporting), progression grouping, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-399 passed, 0 failed
+424 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1200,11 +1201,9 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Multiple open tabs are not coordinated; the last tab to write wins.
 - There is no schema-version field or explicit migration system.
 - The entire state is rewritten on every save, which may become slow with very large histories.
-- Boot-time and theme-save failures are silent.
 - Stored theme values are validated; an unrecognized value falls back to `system`.
 - The saved theme may not be applied until after the first paint, so a brief flash of the system theme is possible.
 - Recovery copies are not pruned automatically.
-- The recovery alert may claim a copy was kept even if the recovery write failed.
 - A corrupt draft is silently discarded and replaced; no warning is shown.
 - Opening the app through `file://` can restrict persistence or clipboard behavior depending on the browser.
 - There is no service worker or installable offline package.
@@ -1508,7 +1507,7 @@ The developer can explain:
 - [x] JSON restore with validation and normalization
 - [x] Light/dark/system theme with persistence
 - [x] Responsive layout
-- [x] Storage write-failure warning
+- [x] Storage write-failure warnings, including boot and theme saves
 - [x] Recovery copy for unreadable stored data
 - [x] Duplicate-date prevention when saving
 - [x] Dependency-free automated regression suite
@@ -1538,7 +1537,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-399 passed, 0 failed
+424 passed, 0 failed
 ```
 
 ---
@@ -1559,7 +1558,7 @@ If a feature increases complexity without significantly improving workout tracki
 
 # 21. Document Maintenance
 
-- This document describes the current implementation as of **2026-11-10**.
+- This document describes the current implementation as of **2026-11-14**.
 - The implementation and this document should be updated together when behavior changes.
 - The data model, storage keys, save rules, and Known Limitations should be reviewed whenever code changes.
 - Run `node tests/run-tests.mjs` before considering a behavior change complete.

@@ -104,7 +104,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-399 passed, 0 failed
+424 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -142,7 +142,9 @@ State is persisted in `localStorage` under three keys:
 
 The default routine is written to `gym_data` on first launch, so its exercise IDs stay stable across reloads.
 
-If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads defaults. If the data parses but its structure is invalid, the app attempts a recovery copy and normalizes whatever it can, which can produce a blank or partial routine; see [Limitations](#limitations).
+If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads defaults. The alert tells you whether the recovery copy was actually kept. If the data parses but its structure is invalid, the app attempts a recovery copy and normalizes whatever it can, which can produce a blank or partial routine; see [Limitations](#limitations).
+
+If a save fails because browser storage is full or blocked, the app shows a warning. This includes the initial save on load and saving a theme change. The warning is shown at most once until a later save succeeds.
 
 ---
 
