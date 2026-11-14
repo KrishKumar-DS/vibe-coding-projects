@@ -1681,6 +1681,78 @@ const planIds = c => new Set(Object.values(c.api.getS().plan).flatMap(p => p.ex.
 }
 
 // =====================================================================
+section('Bugs.md 16 — prototype-named exercises behave like plain names');
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  plan[0].ex = ['toString', 'constructor', '__proto__', 'hasOwnProperty'].map((n, i) => ({ id: 'proto-' + i, n, m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }));
+  const logs = [{ id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'toString', m: 'Chest', sets: [{ w: 50, r: 5 }] }] }];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('boot keeps prototype-named exercises', c.api.getS().plan[0].ex.map(e => e.n), ['toString', 'constructor', '__proto__', 'hasOwnProperty']);
+  eq('backfill assigns the matching prototype-named identity', c.api.getS().logs[0].ex[0].xid, 'proto-0');
+  const html = c.dom.get('#v').innerHTML;
+  ok('suggestions include prototype-named exercises', html.includes('value="toString"') && html.includes('value="__proto__"'));
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [{ id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'constructor', m: 'Chest', sets: [{ w: 40, r: 5 }] }] }];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('unmatched prototype-named log keeps no identity', c.api.getS().logs[0].ex[0].xid, '');
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const plan = JSON.parse(DEFAULTS).plan;
+  plan[0].ex = [{ id: 'r-toString', n: 'toString', m: 'Back', smin: 3, smax: 4, rmin: 8, rmax: 12 }];
+  c.ctl.prompt = JSON.stringify({ plan, logs: [] });
+  c.fireClick({ a: 'rs' });
+  ok('restore with prototype names succeeds', c.alerts.includes('Backup restored.'));
+  eq('restore keeps the prototype-named exercise', c.api.getS().plan[0].ex[0].n, 'toString');
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'Legacy Row', m: 'Back', xid: 'toString', sets: [{ w: 40, r: 10 }] }] },
+    { id: 'l2', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'Pull', ex: [{ n: 'Proto Row', m: 'Back', xid: '__proto__', sets: [{ w: 45, r: 10 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  const byXid = Object.fromEntries(opts.map(o => [o[1], o[2]]));
+  eq('missing routine id "toString" keeps the logged label', byXid['xid:toString'], 'Legacy Row');
+  eq('missing routine id "__proto__" keeps the logged label', byXid['xid:__proto__'], 'Proto Row');
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'toString', m: 'Chest', xid: 'a1', sets: [{ w: 50, r: 8 }] }] },
+    { id: 'l2', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'Pull', ex: [{ n: 'toString', m: 'Back', xid: 'a2', sets: [{ w: 60, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('duplicate "toString" identities stay separate', opts.length, 2);
+  ok('duplicate "toString" labels add muscle context', opts.every(o => o[2].includes(' · ')), opts.map(o => o[2]));
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [
+    { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: '__proto__', m: 'Chest', xid: 'b1', sets: [{ w: 50, r: 8 }] }] },
+    { id: 'l2', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'Pull', ex: [{ n: '__proto__', m: 'Back', xid: 'b2', sets: [{ w: 60, r: 8 }] }] },
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const opts = [...c.dom.get('#v').innerHTML.matchAll(/<option[^>]*value="([^"]*)"[^>]*>([^<]*)<\/option>/g)];
+  eq('duplicate "__proto__" identities stay separate', opts.length, 2);
+  ok('duplicate "__proto__" labels add muscle context', opts.every(o => o[2].includes(' · ')), opts.map(o => o[2]));
+}
+{
+  const plan = JSON.parse(DEFAULTS).plan;
+  const logs = [{ id: 'l1', date: '2026-09-21', day: 'Monday', year: 2026, di: 0, name: 'Push', ex: [{ n: 'constructor', m: 'Chest', sets: [{ w: 50, r: 8 }] }] }];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  addExercise(c, 'constructor');
+  eq('new exercise uses the recorded muscle for "constructor"', c.api.getD().ex.at(-1).m, 'Chest');
+}
+
+// =====================================================================
 console.log('\n' + '='.repeat(60));
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
