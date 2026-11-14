@@ -104,7 +104,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-424 passed, 0 failed
+437 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -140,7 +140,7 @@ State is persisted in `localStorage` under three keys:
 | `gym_draft` | The in-progress workout draft, kept separate from completed history. |
 | `gym_theme` | Your theme preference (`light`, `dark`, or `system`). |
 
-The default routine is written to `gym_data` on first launch, so its exercise IDs stay stable across reloads.
+The default routine is written to `gym_data` on first launch, so its exercise IDs stay stable across reloads. Exercise names are plain strings, so unusual names such as `toString` or `constructor` work like any other name.
 
 If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads defaults. The alert tells you whether the recovery copy was actually kept. If the data parses but its structure is invalid, the app attempts a recovery copy and normalizes whatever it can, which can produce a blank or partial routine; see [Limitations](#limitations).
 

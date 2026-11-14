@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 424 tests as of 2026-11-14
+**Automated Tests:** `node tests/run-tests.mjs` — 437 tests as of 2026-11-14
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -841,6 +841,7 @@ The theme is stored separately from `S` and `D`.
 - A logged exercise stores that identity as `xid`.
 - Progression groups by `xid` first, then by name for legacy records.
 - On load and restore, legacy logs without `xid` are backfilled only when an exercise name maps to exactly one routine identity across the entire plan.
+- Exercise names and IDs are opaque strings: values such as `toString`, `constructor`, or `__proto__` behave like any other name or ID during boot, restore, identity backfill, muscle fallback, and Progression labels.
 - Duplicate routine exercise IDs are replaced during normalization; the first exercise with that ID keeps it.
 - Logs that used a duplicated `xid` are moved to the matching routine exercise only when name and muscle identify exactly one match; otherwise the exercise stays name-based.
 - Ambiguous names remain name-based.
@@ -1067,14 +1068,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, History past-day entry, date/weekday mapping, stable exercise identity, storage failures (including boot, theme, and recovery-copy reporting), progression grouping, and regression flows.
+- Covers malformed storage, backup validation, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate ID repair, dirty-draft detection, History past-day entry, date/weekday mapping, stable exercise identity, prototype-key exercise names, storage failures (including boot, theme, and recovery-copy reporting), progression grouping, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-424 passed, 0 failed
+437 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1537,7 +1538,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-424 passed, 0 failed
+437 passed, 0 failed
 ```
 
 ---

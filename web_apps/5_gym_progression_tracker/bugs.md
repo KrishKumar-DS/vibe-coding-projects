@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-14)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **424 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **437 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > The existing regression suite passes, so these are uncovered issues rather than failing tests.
@@ -15,7 +15,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 16 | P3 | Hardening | Plain-object maps can collide with prototype keys |
 | 18 | Tests | Test coverage | Missing regressions for the issues above |
 | 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
 | 21 | P2 | Recovery | Structurally invalid data becomes a blank/partial plan, not defaults |
@@ -36,46 +35,10 @@
 ### Recommended patch order
 
 1. Item **20** — P1 past-day edit workflow.
-2. Item **16** — quick reliability improvements.
-3. Item **18** — regression coverage.
-4. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
+2. Item **18** — regression coverage.
+3. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Items **11**, **12**, **13**, **14**, and **15** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, `Bugs.md 14`, and `Bugs.md 15` tests.
-
----
-
-# Priority 3 — Quick UI and reliability fixes
-
-## 16. Plain-object maps can collide with prototype keys
-
-**Priority:** P3
-**Where:** `js/app.js:75`, `js/app.js:176`, `js/app.js:241`, `js/app.js:251`
-
-### Problem
-
-`byName`, `allEx()`, `planName`, and `labelCount` use `{}`. Exercise names such as `constructor`, `toString`, or `__proto__` can resolve inherited properties, producing wrong muscle fallbacks, labels, or duplicate-label counts.
-
-This is also a crash, not only a display bug: a routine exercise named `toString` or `constructor` makes `backfillXids()` evaluate `byName[e.n]` as an inherited function and then call `.add(...)` on it. That throws during boot or restore.
-
-### Fix
-
-Use null-prototype objects:
-
-```js
-const byName = Object.create(null);
-const m = Object.create(null);
-const planName = Object.create(null);
-const labelCount = Object.create(null);
-```
-
-Or use `Map` consistently.
-
-### Acceptance
-
-- Exercise names that match prototype property names behave like normal strings.
-- Progress labels and muscle fallbacks remain correct.
-- Boot and restore do not throw for such names.
-- A regression test covers `toString`, `constructor`, and `__proto__`.
+Items **11**, **12**, **13**, **14**, **15**, and **16** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, `Bugs.md 14`, `Bugs.md 15`, and `Bugs.md 16` tests.
 
 ---
 
@@ -106,10 +69,10 @@ Add tests for:
 14. A valid backup whose write fails reports a storage failure, not an invalid backup.
 15. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
 16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-17. Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).
+17. ~~Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).~~ Covered by the Bugs.md 16 tests.
 18. ~~The History past-day control opens the chosen date as a new workout without moving an existing record.~~ Covered by the Bugs.md 14 tests.
 
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, the History past-day control, boot/theme storage-failure warnings, and accurate recovery-copy reporting.
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, the History past-day control, boot/theme storage-failure warnings, accurate recovery-copy reporting, and prototype-key exercise names.
 
 ### Acceptance
 
@@ -569,6 +532,32 @@ Result: a brief dark flash can occur before the light theme is applied.
 
 # Resolved Items
 
+## 16. Plain-object maps can collide with prototype keys
+
+**Status:** Resolved
+
+### Original problem
+
+`backfillXids()`, `allEx()`, and the Progression view built lookup maps with `{}`. Exercise names and imported IDs such as `toString`, `constructor`, or `__proto__` resolved inherited properties. This produced wrong muscle fallbacks and labels, and duplicate-label counts missed collisions. A routine exercise named `toString` or `constructor` made `backfillXids()` treat an inherited function as a set and call `.add(...)` on it, which threw during boot and restore.
+
+### Fix
+
+- `backfillXids()` uses a null-prototype `byName` map.
+- `allEx()` uses a null-prototype muscle map.
+- `prog_v()` uses null-prototype `planName` and `labelCount` maps.
+- Exercise names and IDs that match built-in object properties now behave like any other string.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 16 — prototype-named exercises behave like plain names”.
+
+### Acceptance
+
+- [x] Exercise names that match prototype property names behave like normal strings.
+- [x] Progress labels and muscle fallbacks remain correct.
+- [x] Boot and restore do not throw for such names.
+- [x] A regression test covers `toString`, `constructor`, `__proto__`, and `hasOwnProperty`.
+
+---
+
 ## 15. Boot-time and theme saves fail silently
 
 **Status:** Resolved
@@ -952,7 +941,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `424 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `437 passed, 0 failed`.
 - [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -965,6 +954,7 @@ After applying the fixes, verify:
 - [x] Disabled future-day chips are visually distinct.
 - [x] Native controls follow dark mode.
 - [x] Storage failures are reported on boot and theme changes.
+- [x] Prototype-key exercise names boot, restore, backfill, and label correctly.
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.
 - [x] The History past-day control opens the chosen past date without moving an existing workout.
