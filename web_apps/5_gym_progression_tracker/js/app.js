@@ -208,16 +208,21 @@ function validateBackup(o) {
 const isStrict = o => validateBackup(o).ok;
 
 
-function recoverCopy(rawStr, why) {
-    try { localStorage.setItem('gym_data_recovery_' + Date.now(), rawStr) } catch (e) { }
-    try { alert('Your saved workout data was unreadable (' + why + '). A recovery copy was kept in this browser, and default data has been loaded.') } catch (e) { }
+function recoverCopy(rawStr, why, loaded) {
+    let kept = false;
+    try {
+        localStorage.setItem('gym_data_recovery_' + Date.now(), rawStr);
+        kept = true;
+    } catch (e) { }
+    const copy = kept ? 'A recovery copy was kept in this browser.' : 'A recovery copy could not be saved in this browser.';
+    try { alert('Your saved workout data was unreadable (' + why + '). ' + copy + ' ' + loaded) } catch (e) { }
 }
 function bootState() {
     const rawStr = Store.readRaw('gym_data');
     if (rawStr == null) return { S: def(), persist: true, generatedPlan: true };
-    let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON'); return { S: def(), persist: false, generatedPlan: true } }
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure'); return { S: def(), persist: false, generatedPlan: true } }
-    if (!isStrict(raw)) recoverCopy(rawStr, 'missing or malformed fields');
+    let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON', 'Default data has been loaded.'); return { S: def(), persist: false, generatedPlan: true } }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure', 'Default data has been loaded.'); return { S: def(), persist: false, generatedPlan: true } }
+    if (!isStrict(raw)) recoverCopy(rawStr, 'missing or malformed fields', 'The readable parts have been normalized and saved.');
     return { S: normalizeData(raw), persist: true, generatedPlan: false }
 }
 
@@ -226,7 +231,7 @@ const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
 backfillXids();
-if (boot.persist) save(); // persist the plan before any draft can reference its IDs
+if (boot.persist && !save()) Store.notifyStorageFailure(); // persist the plan before any draft can reference its IDs
 D = normDraft(Store.loadDraft());
 if (boot.generatedPlan && D && remapDraftXids(D)) {
     if (!saveD()) Store.notifyStorageFailure();
@@ -248,7 +253,7 @@ function applyTheme(t) {
         if (theme === 'system') de.removeAttribute('data-theme');
         else de.dataset.theme = theme;
     }
-    Store.saveTheme(theme);
+    if (!Store.saveTheme(theme)) Store.notifyStorageFailure();
 }
 applyTheme(theme);
 
