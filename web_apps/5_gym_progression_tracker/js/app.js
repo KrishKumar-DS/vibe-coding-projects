@@ -152,7 +152,9 @@ function normDraft(d) {
     }
 }
 function backfillXids() {
-    const byName = {};
+    // Exercise names are user data; a null-prototype map keeps names such as
+    // "toString", "constructor", or "__proto__" from resolving inherited properties.
+    const byName = Object.create(null);
     Object.values(S.plan).forEach(p => p.ex.forEach(e => { (byName[e.n] = byName[e.n] || new Set()).add(e.id) }));
     S.logs.forEach(l => l.ex.forEach(e => { if (e.xid) return; const ids = byName[e.n]; if (ids && ids.size === 1) e.xid = [...ids][0] }));
 }
@@ -312,7 +314,7 @@ function draftName() {
     const existing = D && D.editId ? S.logs.find(l => l.id === D.editId) : null;
     return existing ? (existing.name || '') : ((S.plan[D.di] || {}).name || '')
 }
-function allEx() { const m = {}; Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
+function allEx() { const m = Object.create(null); Object.values(S.plan).forEach(p => p.ex.forEach(e => m[e.n] = e.m)); S.logs.forEach(l => l.ex.forEach(e => m[e.n] = m[e.n] || e.m)); return m }
 function rangePart(min, max, unit) {
     const lo = Number.isFinite(+min) && +min > 0 ? +min : null;
     const hi = Number.isFinite(+max) && +max > 0 ? +max : null;
@@ -417,7 +419,9 @@ function prog_v() {
     // Group history by stable identity (xid) so renaming a routine exercise
     // never splits its progress; legacy logs without an xid fall back to name.
     const keyOf = e => e.xid ? 'xid:' + e.xid : 'name:' + e.n;
-    const planName = {};
+    // Null-prototype maps: IDs and labels are user/import data and may be names
+    // such as "toString" or "__proto__".
+    const planName = Object.create(null);
     Object.values(S.plan).forEach(p => p.ex.forEach(e => { if (e.id) planName[e.id] = e.n }));
     const groups = [], byKey = new Map();
     S.logs.forEach(l => l.ex.forEach(e => {
@@ -427,7 +431,7 @@ function prog_v() {
         else { const ng = { key, xid: e.xid || '', name: e.n, m: e.m, label: e.n }; byKey.set(key, ng); groups.push(ng) }
     }));
     groups.forEach(g => { if (g.xid && planName[g.xid] != null) g.label = planName[g.xid] }); // prefer current routine name
-    const labelCount = {}; groups.forEach(g => (labelCount[g.label] = (labelCount[g.label] || 0) + 1));
+    const labelCount = Object.create(null); groups.forEach(g => (labelCount[g.label] = (labelCount[g.label] || 0) + 1));
     const usedLabels = new Set();
     groups.forEach(g => {
         let label = g.label;
