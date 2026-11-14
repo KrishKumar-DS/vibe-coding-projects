@@ -44,7 +44,7 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
   const store = new Map(Object.entries(seed));
   const listeners = { click: [], input: [], change: [] };
   const alerts = [], confirms = [], prompts = [];
-  const ctl = { confirm: true, prompt: null, ...controls };
+  const ctl = { confirm: true, prompt: null, failWrites, ...controls };
   const elements = new Map();
   const docEl = {
     dataset: {},
@@ -60,7 +60,8 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
     localStorage: {
       getItem: k => (store.has(k) ? store.get(k) : null),
       setItem: (k, v) => {
-        if (failWrites) { const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e }
+        const fail = typeof ctl.failWrites === 'function' ? ctl.failWrites(k, v) : ctl.failWrites;
+        if (fail) { const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e }
         store.set(k, String(v));
       },
       removeItem: k => store.delete(k),
@@ -1070,24 +1071,92 @@ section('Fix 1 — failed save restores every workout (no stale-index corruption
 // =====================================================================
 section('Fix 2 — storage write failures are surfaced for routine and draft edits');
 {
-  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT }, failWrites: true });
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
   eq('no warning before any failing edit', c.alerts.length, 0);
+  c.ctl.failWrites = true;
   c.fireClick({ a: 'tab', t: 'routine' });
   c.fireClick({ a: 'padd' });
   ok('adding a routine exercise warns on failure', c.alerts.some(a => /could not be saved/i.test(a)));
   eq('warning is throttled to once', c.alerts.length, 1);
 }
 {
-  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT }, failWrites: true });
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
+  c.ctl.failWrites = true;
   c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '5' });
   ok('draft edit warns on failure', c.alerts.some(a => /could not be saved/i.test(a)));
   eq('draft edit still applied in memory', c.api.getD().ex[0].sets[0].r, '5');
 }
 {
-  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT }, failWrites: true });
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT } });
+  c.ctl.failWrites = true;
   c.fireClick({ a: 'fin' });
   eq('fin failure shows exactly one alert', c.alerts.length, 1);
   ok('fin failure message is the specific one', c.alerts[0].includes('Could not save'));
+}
+
+// =====================================================================
+section('Bugs.md 15 — boot, theme, and recovery storage failures are reported');
+{
+  const c = app({ failWrites: true });
+  eq('boot save failure warns once', c.alerts.length, 1);
+  ok('boot warning is the throttled storage warning', /could not be saved/i.test(c.alerts[0] || ''));
+  ok('failed boot persists nothing', !c.store.has('gym_data') && !c.store.has('gym_draft') && !c.store.has('gym_theme'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS }, failWrites: true });
+  eq('boot normalization failure warns once', c.alerts.length, 1);
+  eq('loaded data remains available', c.api.getS().plan[0].ex.length, 5);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS }, failWrites: k => k === 'gym_theme' });
+  eq('theme-only boot failure warns once', c.alerts.length, 1);
+  ok('theme warning is the storage warning', /could not be saved/i.test(c.alerts[0] || ''));
+  ok('data is still persisted when only the theme fails', c.store.has('gym_data'));
+  ok('failed theme write is not persisted', !c.store.has('gym_theme'));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_theme: JSON.stringify('system') } });
+  c.ctl.failWrites = k => k === 'gym_theme';
+  c.fireClick({ a: 'theme' });
+  eq('theme is applied in memory despite the write failure', c.docEl.dataset.theme, 'light');
+  eq('theme change failure warns once', c.alerts.length, 1);
+  ok('theme change warning is the storage warning', /could not be saved/i.test(c.alerts[0] || ''));
+  eq('stored theme is unchanged', c.store.get('gym_theme'), JSON.stringify('system'));
+}
+{
+  const c = app({ failWrites: true });
+  eq('one warning after boot', c.alerts.length, 1);
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '5' });
+  eq('a later draft failure does not add a second warning', c.alerts.length, 1);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: DIRTY_DRAFT }, failWrites: true });
+  eq('boot warning is shown before the successful write', c.alerts.length, 1);
+  c.ctl.failWrites = false;
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '5' });
+  c.ctl.failWrites = true;
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '1' }, value: '6' });
+  eq('warning re-arms after a successful write', c.alerts.length, 2);
+}
+{
+  const c = app({ seed: { gym_data: '{{broken' } });
+  ok('successful recovery copy is reported as kept', c.alerts.some(a => /A recovery copy was kept/i.test(a)));
+  ok('successful recovery writes a recovery key', [...c.store.keys()].some(k => k.startsWith('gym_data_recovery_')));
+  ok('successful recovery does not add a storage warning', !c.alerts.some(a => /could not be saved/i.test(a)));
+}
+{
+  const c = app({ seed: { gym_data: '{{broken' }, failWrites: true });
+  ok('failed recovery copy is reported as not saved', c.alerts.some(a => /A recovery copy could not be saved/i.test(a)));
+  ok('failed recovery copy does not claim a copy was kept', !c.alerts.some(a => /A recovery copy was kept/i.test(a)));
+  ok('failed recovery copy writes no recovery key', ![...c.store.keys()].some(k => k.startsWith('gym_data_recovery_')));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  eq('normal boot has no storage warnings', c.alerts.length, 0);
+}
+{
+  const c = app({ seed: { gym_data: '{}' } });
+  ok('structural recovery reports normalization, not defaults', c.alerts.some(a => /readable parts have been normalized/i.test(a)));
 }
 
 // =====================================================================
