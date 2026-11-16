@@ -39,7 +39,8 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 - **Skip / include** — `Skip` grays out an exercise; `Include` brings it back. Skipped exercises are not saved.
 - **Add exercise** — Use the **Add exercise** card at the bottom to append a custom exercise for this session only.
 - **Names** — Finish requires every exercise with completed sets to have a name. Blank routine rows are allowed while editing.
-- **Edit / delete** — From History, `Edit` reopens the saved workout (changes update the original record), and `Delete` asks for confirmation.
+- **Edit / delete** — From History, `Edit` reopens the saved workout (changes update the original record), and `Delete` asks for confirmation. If the edited workout has unsaved changes, deleting it asks a second time before discarding them.
+- **Duplicate exercises** — Adding an exercise that is already in the current workout is blocked with a message instead of creating a second card.
 
 Only sets that are ticked **and** have repetitions are saved.
 
@@ -76,7 +77,7 @@ The Progress view groups exercise history by a stable exercise identity, so rena
 4. The app validates the `plan` and `logs` structures before replacing your current state.
 5. If you have an unfinished workout with unsaved changes, the app asks before discarding it. Cancelling leaves your current routine, history, and draft unchanged.
 
-Backups missing the `plan` object or `logs` array are rejected and your current data is left untouched. Malformed exercise or set entries inside a workout log may be dropped during normalization, and an incomplete plan can be normalized to blank or partial routine days; see [Limitations](#limitations).
+Backups missing the `plan` object or `logs` array are rejected and your current data is left untouched. Restore is strict: future-dated workouts, duplicate workout dates, empty workouts, exercises without names, and malformed set entries are rejected with a specific message. An oversized planned set or rep count is capped and reported. A valid backup whose storage write fails is reported as a storage failure, not an invalid backup; see [Limitations](#limitations).
 
 ---
 
@@ -104,7 +105,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-437 passed, 0 failed
+519 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -117,6 +118,7 @@ No dependencies are required — just Node.js.
 5_gym_progression_tracker/
 ├── index.html          # App shell (main container + bottom nav)
 ├── README.md           # This file
+├── bugs.md             # Bug log, fixes, and verification checklist
 ├── css/
 │   └── style.css       # Styles and light/dark theme variables
 ├── js/
@@ -142,7 +144,11 @@ State is persisted in `localStorage` under three keys:
 
 The default routine is written to `gym_data` on first launch, so its exercise IDs stay stable across reloads. Exercise names are plain strings, so unusual names such as `toString` or `constructor` work like any other name.
 
-If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads defaults. The alert tells you whether the recovery copy was actually kept. If the data parses but its structure is invalid, the app attempts a recovery copy and normalizes whatever it can, which can produce a blank or partial routine; see [Limitations](#limitations).
+If saved data is not valid JSON, the app attempts to keep a recovery copy under a `gym_data_recovery_<timestamp>` key and loads the default routine. Only the newest recovery copy for each source is kept. The alert names the key and tells you whether the copy was actually kept.
+
+If the data parses but its structure is invalid, the app restores the default routine for the invalid plan, keeps usable workout logs, drops future-dated, duplicate-date, or malformed records, persists the repaired state, and reports exactly what changed. Boot is deliberately more forgiving than restore.
+
+A corrupt `gym_draft` is reported and copied under `gym_draft_recovery_<timestamp>` before a fresh draft is written. A saved Light or Dark theme is applied by a small inline `<head>` script before the stylesheet paints, so it does not flash the system theme.
 
 If a save fails because browser storage is full or blocked, the app shows a warning. This includes the initial save on load and saving a theme change. The warning is shown at most once until a later save succeeds.
 
@@ -156,11 +162,8 @@ If a save fails because browser storage is full or blocked, the app shows a warn
 - **No backend or database.**
 - **Not encrypted.** Data is stored as plain text in `localStorage`. Displayed stored text is HTML-escaped, but there is no Content Security Policy.
 - **No offline guarantee.** There is no service worker, so offline behavior is not guaranteed in a served environment. Because there are no external assets, opening the files locally does not need a network connection.
-- **Limited import validation.** Malformed exercise or set entries inside logs may be dropped, and empty or future-dated workouts can be imported.
-- **Duplicate dates from an import** can make those workouts uneditable until one is moved or deleted.
-- **Deleting an open workout** with unsaved edits discards those edits after the delete confirmation.
-- **Progress labels** can be blank or lose their muscle context when routine names are blank or duplicated.
-- **Theme flash on load.** The saved theme may briefly flash the system theme before your choice is applied.
+- **Limited import recovery UI.** Invalid JSON is preserved in a recovery key, but there is no in-app button to restore it; copy the value from `localStorage` manually.
+- **Editing date changes.** Changing the date while editing still moves the saved workout; there is no Cancel Edit action yet.
 - **Basic analytics.** Progression focuses on top-set weight, estimated 1RM, session count, and workout volume.
 - **No nutrition, body-weight, RPE/RIR, rest timer, or PR detection** in this version.
 

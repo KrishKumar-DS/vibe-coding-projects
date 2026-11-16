@@ -1,96 +1,35 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-14)
+**Date:** 2026-10-27 (last updated 2026-11-16)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **437 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **519 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
-> The existing regression suite passes, so these are uncovered issues rather than failing tests.
-> The PRD now documents many of them under Known Limitations, but the code still needs the fixes.
-> Line numbers refer to the current implementation and may shift after edits.
+> The only open issue is **#20**. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
+> Items keep their original numbers so existing references remain stable.
 
 ---
 
-## Summary
+## Open Items Summary
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 18 | Tests | Test coverage | Missing regressions for the issues above |
 | 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
-| 21 | P2 | Recovery | Structurally invalid data becomes a blank/partial plan, not defaults |
-| 22 | P2 | Import integrity | Validator silently drops malformed log exercises/sets; accepts empty workouts |
-| 23 | P2 | Import integrity | Future-dated workouts are accepted on restore and boot |
-| 24 | P2 | Workout editing | Duplicate exercise can be added to one workout |
-| 26 | P2 | Editing | Duplicate imported dates make both workouts uneditable |
-| 27 | P3 | Draft safety | Deleting the currently edited workout discards a dirty draft |
-| 28 | P3 | Progression UX | Empty routine names and suffix logic break Progress labels |
-| 29 | P3 | Exercise identity | Ambiguous legacy names get an arbitrary identity on edit |
-| 30 | P3 | UX | Restore write failure is reported as “Invalid backup” |
-| 31 | P3 | Hardening | Unbounded set counts can freeze or crash the app |
-| 32 | P3 | Storage | Recovery copies accumulate; corrupt drafts are silently discarded |
-| 33 | P3 | Theme UX | Saved theme can flash after first paint |
 
-> Items **20–33** were added in a follow-up review after the original 18. Item **19** was added at the same time and is now resolved. Follow-up items keep their original numbers so existing references remain stable.
-
-### Recommended patch order
+### Recommended next patch
 
 1. Item **20** — P1 past-day edit workflow.
-2. Item **18** — regression coverage.
-3. Follow-up items **21–24, 26–33** — work down the remaining follow-up priorities.
 
-Items **11**, **12**, **13**, **14**, **15**, and **16** are resolved and covered by the `Bugs.md 11`, `Bugs.md 12`, `Bugs.md 13`, `Bugs.md 14`, `Bugs.md 15`, and `Bugs.md 16` tests.
+Resolved work is listed below. Items **18** and **21–24, 26–33** are complete; item **20** remains open.
 
 ---
 
-# Test Coverage
-
-## 18. Add regression tests for the fixes above
-
-**Priority:** Tests
-**Where:** `tests/run-tests.mjs`
-
-### Remaining coverage
-
-Add tests for:
-
-1. ~~Restore with a dirty draft prompts and preserves the draft on cancel.~~ Covered by the Bugs.md 10 tests.
-2. ~~Draft and theme injection payloads remain escaped.~~ Covered by the Bugs.md 11 tests.
-3. ~~Invalid theme values fall back to `system`.~~ Covered by the Bugs.md 11 tests.
-4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
-5. ~~First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.~~ Covered by the Bugs.md 19 tests.
-6. Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.
-7. Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.
-8. Restore and boot reject future-dated workouts.
-9. Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.
-10. Imported duplicate dates do not make both records uneditable.
-11. Deleting the currently edited workout with dirty changes warns before discarding the draft.
-12. Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.
-13. Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.
-14. A valid backup whose write fails reports a storage failure, not an invalid backup.
-15. A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.
-16. Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.
-17. ~~Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).~~ Covered by the Bugs.md 16 tests.
-18. ~~The History past-day control opens the chosen date as a new workout without moving an existing record.~~ Covered by the Bugs.md 14 tests.
-
-> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, the History past-day control, boot/theme storage-failure warnings, accurate recovery-copy reporting, and prototype-key exercise names.
-
-### Acceptance
-
-- Each new test fails before the corresponding fix and passes after it.
-- The full suite remains green.
-- Test names describe the behavior, not the implementation detail.
-
----
-
-# Follow-up Review — Additional Bugs (20–33)
-
-These findings were added after the original 18. They were reproduced by driving the app's own handlers with fixed dates, so the test suite's existing green status did not cover them. Item **19** is now resolved and covered by the `Bugs.md 19` test section.
-
----
+# Open Items
 
 ## 20. Changing the date while editing still moves the saved workout; there is no Cancel Edit path
 
 **Priority:** P1
+**Status:** Open
 **Where:** `js/app.js` — `openDate()`, the weekday-chip handler (`a === 'day'`), the date-input change handler (`id === 'dt'`), and Finish (`a === 'fin'`)
 
 ### Problem
@@ -124,91 +63,146 @@ Result: today's workout is moved to the chosen date. No new workout is created, 
 
 ---
 
+# Resolved Items
+
+## 18. Add regression tests for the fixes above
+
+**Priority:** Tests
+**Status:** Resolved
+**Where:** `tests/run-tests.mjs`
+
+### Coverage
+
+Tests added for:
+
+1. ~~Restore with a dirty draft prompts and preserves the draft on cancel.~~ Covered by the Bugs.md 10 tests.
+2. ~~Draft and theme injection payloads remain escaped.~~ Covered by the Bugs.md 11 tests.
+3. ~~Invalid theme values fall back to `system`.~~ Covered by the Bugs.md 11 tests.
+4. ~~Routine validation rejects blank names and inverted ranges.~~ Covered by the Bugs.md 9 tests.
+5. ~~First boot followed by a reload with only `gym_draft` preserves plan/log identities and does not split Progress.~~ Covered by the Bugs.md 19 tests.
+6. ~~Structurally invalid boot data yields the documented fallback (defaults) and does not silently persist a blank plan.~~ Covered by the Bug #18 boot-repair tests.
+7. ~~Backup validation rejects or reports malformed log exercises and set entries instead of silently dropping them.~~ Covered by the Bug #18 malformed-log tests.
+8. ~~Restore and boot reject future-dated workouts.~~ Covered by the Bug #18 future-date tests.
+9. ~~Adding the same exercise twice in one workout does not create duplicate cards, doubled volume, or duplicate Progress entries.~~ Covered by the Bug #18 duplicate-add tests.
+10. ~~Imported duplicate dates do not make both records uneditable.~~ Covered by the Bug #18 duplicate-date tests.
+11. ~~Deleting the currently edited workout with dirty changes warns before discarding the draft.~~ Covered by the Bug #18 dirty-delete tests.
+12. ~~Blank routine names do not blank out a recorded Progress label, and duplicate-label suffixes preserve muscle information.~~ Covered by the Bug #18 Progress-label tests.
+13. ~~Editing a legacy ambiguous-name exercise does not arbitrarily assign one routine identity.~~ Covered by the Bug #18 ambiguous-legacy tests.
+14. ~~A valid backup whose write fails reports a storage failure, not an invalid backup.~~ Covered by the Bug #18 restore-write-failure tests.
+15. ~~A huge imported/routine `smin` is rejected or capped rather than allocating an unbounded set array.~~ Covered by the Bug #18 cap tests.
+16. ~~Invalid stored JSON does not create a new recovery copy on every reload, and a corrupt draft is reported instead of silently overwritten.~~ Covered by the Bug #18 recovery tests.
+17. ~~Boot and restore do not crash for prototype-key names (`toString`, `constructor`, `__proto__`).~~ Covered by the Bugs.md 16 tests.
+18. ~~The History past-day control opens the chosen date as a new workout without moving an existing record.~~ Covered by the Bugs.md 14 tests.
+19. ~~The saved theme is applied before the first paint.~~ Covered by the Bug #18 theme-bootstrap test.
+
+> Already covered: cross-weekday workout-name preservation, weekday-chip date conflicts, disabled future-day chip markup and styling, native-control `color-scheme` theming, the History past-day control, boot/theme storage-failure warnings, accurate recovery-copy reporting, and prototype-key exercise names.
+
+### Acceptance
+
+- [x] Each new test was observed failing before the corresponding fix and passes after it.
+- [x] The full suite remains green.
+- [x] Test names describe the behavior, not the implementation detail.
+- [x] The suite grew from 437 to 519 passing tests.
+
+---
+
 ## 21. Structurally invalid stored data becomes a blank or partial plan instead of defaults
 
 **Priority:** P2
-**Where:** `js/app.js:105-116` (`recoverCopy`/`bootState`), `js/app.js:67-69` (`normalizeData`), `js/app.js:124` (boot save); `README.md:139`
+**Status:** Resolved
+**Where:** `js/app.js` — `normalizeData`, `bootState`, and boot persistence
 
 ### Problem
 
-Invalid JSON loads `def()` as the alert claims. A parsed but structurally invalid object follows a different path:
+Before the fix, invalid JSON loaded `def()`, but a parsed yet structurally invalid object followed a different path:
 
 ```js
 recoverCopy(rawStr, 'missing or malformed fields');
 return { S: normalizeData(raw), persist: true };
 ```
 
-`normalizeData({})` produces seven blank routine days with no exercises, and `persist: true` immediately saves that blank plan. The alert still says “default data has been loaded.”
+`normalizeData({})` produced seven blank routine days with no exercises, and `persist: true` immediately saved that blank plan. The alert still said “default data has been loaded.”
 
-Also, a payload such as `{ plan: "bad", logs: [validLog] }` keeps the logs but replaces the entire routine with blank days.
+Also, a payload such as `{ plan: "bad", logs: [validLog] }` kept the logs but replaced the entire routine with blank days.
 
 ### Reproduction
 
 1. Seed `gym_data` with `{}` or with a missing/invalid `plan`.
 2. Open the app.
-3. Observe the recovery alert saying defaults were loaded.
+3. Observe the recovery alert.
 4. Check the Routine tab and Today draft.
 
-Result: `plan[0]` is `{ "name": "", "ex": [] }`, the draft has zero exercises, and `gym_data` is rewritten with the blank plan.
+Before the fix: `plan[0]` was `{ "name": "", "ex": [] }`, the draft had zero exercises, and `gym_data` was rewritten with the blank plan.
+
+After the fix: the default routine is restored, usable logs are preserved, the repaired state is persisted, and the alert states exactly which parts were recovered.
 
 ### Fix
 
-- On structural validation failure, load `def()` for invalid/missing plan sections, or otherwise fill missing routines with defaults.
+- On structural validation failure, load `def()` for an invalid/missing plan while preserving structurally valid logs.
 - Do not persist a partial blank state without telling the user exactly what was lost.
-- Make the recovery alert and `README.md:139` match the actual fallback.
-- Consider preserving structurally valid logs while restoring a default plan, and expose a recovery-copy restore path.
+- Make the recovery alert and `README.md` match the actual fallback.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug #18 — boot repairs invalid plans without losing usable logs”.
 
 ### Acceptance
 
-- A corrupt/empty `gym_data` does not silently erase the default routine.
-- The alert accurately states whether defaults or normalized partial data were loaded.
-- Boot does not persist a blank plan after a structural validation failure.
-- A regression test starts from `gym_data = "{}"` and asserts the default exercises exist.
+- [x] A corrupt/empty `gym_data` does not silently erase the default routine.
+- [x] The alert accurately states what was recovered.
+- [x] Boot does not persist a blank plan after a structural validation failure.
+- [x] A regression test starts from `gym_data = "{}"` and asserts the default exercises exist.
 
 ---
 
 ## 22. Backup/boot validation silently drops malformed log exercises and sets; empty workouts are accepted
 
 **Priority:** P2
-**Where:** `js/app.js:81-101` (`validateBackup`), `js/app.js:58-62` (`normLogEx`), `js/app.js:63-66` (`normLog`), `js/app.js:124` (boot save), `js/app.js:356-365` (restore)
+**Status:** Resolved
+**Where:** `js/app.js` — `validateImport`, `normalizeData` diagnostics, and the restore handler
 
 ### Problem
 
-`validateBackup` checks that a log exercise is an object and that `sets` is an array, but it does not check:
+`validateBackup` checked that a log exercise is an object and that `sets` is an array, but it did not check:
 
 - that the exercise has a non-empty string name;
 - that each set entry is an object;
 - that a set contains usable repetitions;
 - that the workout contains at least one exercise.
 
-The normalizer then discards malformed pieces silently.
+The normalizer then discarded malformed pieces silently.
 
 ### Reproduction
 
-- Restoring `{plan:{},logs:[{date:"2026-10-13",ex:[{sets:[{w:10,r:5}]}]}]}` shows **“Backup restored.”** but saves a workout with `ex: []`.
-- Booting with `{n:"Squat",m:"Legs",sets:[{w:60,r:8},null,{w:70}]}` produces no warning and saves only the first set.
-- Restoring a log with `ex: []` is accepted, even though the UI's Finish action prevents creating empty workouts.
+Before the fix:
+
+- Restoring `{plan:{},logs:[{date:"2026-10-13",ex:[{sets:[{w:10,r:5}]}]}]}` showed **“Backup restored.”** but saved a workout with `ex: []`.
+- Booting with `{n:"Squat",m:"Legs",sets:[{w:60,r:8},null,{w:70}]}` produced no warning and saved only the first set.
+- Restoring a log with `ex: []` was accepted, even though the UI's Finish action prevents creating empty workouts.
+
+After the fix: strict restore rejects the whole backup with a specific message; boot drops unusable entries once and reports the counts.
 
 ### Fix
 
 - Require each log exercise to have a non-empty string name and at least one structurally valid set.
-- Require each set entry to be an object with finite numeric weight/reps values (or explicitly documented repair rules).
-- Reject empty workouts on import and boot, or report how many records were dropped.
-- Add a boot-time warning when normalization drops log data, and use the same behavior for restore.
+- Require each set entry to be an object with finite numeric weight/reps values.
+- Reject empty workouts on import; on boot, drop them and report the count.
+- Add a boot-time warning when normalization drops log data.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug #18 — malformed logs are rejected on restore and reported on boot”.
 
 ### Acceptance
 
-- A backup containing a nameless exercise is rejected with a specific error, or its dropped records are reported.
-- Null/partial set entries are not silently discarded without feedback.
-- Empty workouts are not importable.
-- Boot and restore use the same validation/reporting rules.
+- [x] A backup containing a nameless exercise is rejected with a specific error.
+- [x] Null/partial set entries are not silently discarded without feedback.
+- [x] Empty workouts are not importable.
+- [x] Boot and restore use the same log rules, with repair-on-boot and rejection-on-restore.
 
 ---
 
 ## 23. Future-dated workouts are accepted on restore and boot
 
 **Priority:** P2
-**Where:** `js/app.js:93` (`validateBackup` only checks `isDate`), `js/app.js:63-66` (`normLog`), `js/app.js:331` (Finish rejects future dates)
+**Status:** Resolved
+**Where:** `js/app.js` — `validateImport`, `normalizeData`
 
 ### Problem
 
@@ -239,7 +233,8 @@ Result: the update is rejected until the date is changed.
 ## 24. “Add exercise” allows duplicates within one workout
 
 **Priority:** P2
-**Where:** `js/app.js:332-345` (`addx`), `js/app.js:223-226` (Add exercise fields)
+**Status:** Resolved
+**Where:** `js/app.js` — `addx`, `addName`/`addMuscle` state, and the add-exercise inputs
 
 ### Problem
 
@@ -277,7 +272,8 @@ Result: two Bench Press entries in History and doubled volume.
 ## 26. Duplicate dates from an imported backup make both workouts uneditable
 
 **Priority:** P2
-**Where:** `js/app.js:332` (Finish conflict check), `js/app.js:175` (`openDate` picks the first), `js/app.js:342` (Edit by ID)
+**Status:** Resolved
+**Where:** `js/app.js` — `validateImport`, `normalizeData`, `dateTaken`
 
 ### Problem
 
@@ -308,7 +304,8 @@ Result: “Another workout already exists…” and the edit cannot be saved.
 ## 27. Deleting the workout currently open in the draft discards dirty changes
 
 **Priority:** P3
-**Where:** `js/app.js:344-350` (`dl`)
+**Status:** Resolved
+**Where:** `js/app.js` — `dl` handler
 
 ### Problem
 
@@ -340,7 +337,8 @@ Result: the dirty draft is discarded and replaced by a fresh Today draft, with n
 ## 28. Empty routine names and suffix logic break Progress labels
 
 **Priority:** P3
-**Where:** `js/app.js:250` (`planName[g.xid] != null`), `js/app.js:255-258` (duplicate labels)
+**Status:** Resolved
+**Where:** `js/app.js` — `prog_v()` label selection and disambiguation
 
 ### Problem
 
@@ -370,7 +368,8 @@ Two related label issues:
 ## 29. Editing a legacy ambiguous-name exercise assigns an arbitrary identity
 
 **Priority:** P3
-**Where:** `js/app.js:170` (`fromLog` name fallback)
+**Status:** Resolved
+**Where:** `js/app.js` — `fromLog`
 
 ### Problem
 
@@ -401,7 +400,8 @@ Result: the draft receives the first matching identity and the workout is assign
 ## 30. A valid restore whose write fails is reported as “Invalid backup”
 
 **Priority:** P3
-**Where:** `js/app.js:364`
+**Status:** Resolved
+**Where:** `js/app.js` — restore (`a === 'rs'`)
 
 ### Problem
 
@@ -420,22 +420,25 @@ Result: the app reports an invalid backup rather than a storage failure.
 
 ### Fix
 
-- Use a distinct message for write failures, for example “Backup is valid, but it could not be saved to this browser's storage.”
-- Reuse the throttled storage-failure notification where appropriate.
+- Use a distinct message for write failures: “Backup is valid, but it could not be saved to this browser's storage.”
+- Keep the validated plan and logs visible in memory so the user can retry or create a new backup.
 - Keep validation errors separate from write errors.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug #18 — a valid backup that cannot be saved is not called invalid”.
 
 ### Acceptance
 
-- Invalid backups and storage-write failures produce different messages.
-- A write failure preserves the previous in-memory state.
-- The user is told the backup itself was valid.
+- [x] Invalid backups and storage-write failures produce different messages.
+- [x] A write failure keeps the validated backup visible in memory and does not claim the backup is invalid.
+- [x] The user is told the backup itself was valid.
 
 ---
 
 ## 31. Unbounded set counts can freeze or crash the app
 
 **Priority:** P3
-**Where:** `js/app.js:160` (`mk` / `Array.from`), `js/app.js:290` (routine range inputs), `js/app.js:81-101` (import validation)
+**Status:** Resolved
+**Where:** `js/app.js` — `MAX_PLANNED_SETS`, `MAX_PLANNED_REPS`, normalization, `mk`, routine inputs
 
 ### Problem
 
@@ -465,7 +468,8 @@ Result: the app hangs or crashes while building the draft.
 ## 32. Recovery copies accumulate and corrupt drafts are silently discarded
 
 **Priority:** P3
-**Where:** `js/app.js:105-108` (`recoverCopy`), `js/app.js:109-114` (boot), `js/app.js:122`, `js/app.js:192`, `js/store.js:11`, `js/store.js:25`
+**Status:** Resolved
+**Where:** `js/app.js` — `recoverCopy`, boot draft handling; `js/store.js` — `keys`, `remove`
 
 ### Problem
 
@@ -502,7 +506,8 @@ For the draft, set `gym_draft` to invalid JSON and reload; the draft disappears 
 ## 33. Saved theme can flash after first paint
 
 **Priority:** P3
-**Where:** `index.html:14-15` (deferred scripts), `js/app.js:138` (`applyTheme`), `css/style.css:14-30`
+**Status:** Resolved
+**Where:** `index.html` — inline `<head>` theme bootstrap; `js/app.js` — `applyTheme`
 
 ### Problem
 
@@ -529,8 +534,6 @@ Result: a brief dark flash can occur before the light theme is applied.
 - Invalid stored theme values still fall back to `system`.
 
 ---
-
-# Resolved Items
 
 ## 16. Plain-object maps can collide with prototype keys
 
@@ -941,8 +944,8 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `437 passed, 0 failed`.
-- [ ] No HTML/CSS/JS file was changed unintentionally by documentation edits.
+- [x] `node tests/run-tests.mjs` → `519 passed, 0 failed`.
+- [x] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [x] Weekday chips block occupied dates immediately while editing.
@@ -958,19 +961,21 @@ After applying the fixes, verify:
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.
 - [x] The History past-day control opens the chosen past date without moving an existing workout.
-- [ ] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record.
-- [ ] Corrupt/empty `gym_data` does not silently erase the default routine.
-- [ ] Malformed imported exercises/sets are rejected or reported, not silently dropped.
-- [ ] Future-dated workouts cannot enter through restore or boot.
-- [ ] Adding the same exercise twice does not double volume or create duplicate Progress entries.
-- [ ] Duplicate imported dates are rejected or remain editable.
-- [ ] Deleting a dirty workout that is open in the draft warns before discarding edits.
-- [ ] Blank routine names never blank out recorded Progress labels; duplicate suffixes keep muscle context.
-- [ ] Ambiguous legacy names are not arbitrarily assigned an identity.
-- [ ] A valid backup that fails to write reports a storage failure, not an invalid backup.
-- [ ] Huge set counts are rejected or capped.
-- [ ] Repeated reloads do not accumulate recovery copies, and corrupt drafts are reported.
-- [ ] The saved theme is applied before the first visible paint.
+- [ ] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record. (Deferred with item **20**.)
+- [x] Corrupt/empty `gym_data` does not silently erase the default routine.
+- [x] Malformed imported exercises/sets are rejected on restore and reported on boot.
+- [x] Future-dated workouts cannot enter through restore or boot.
+- [x] Adding the same exercise twice does not double volume or create duplicate Progress entries.
+- [x] Duplicate imported dates are rejected on restore; boot keeps the first and reports the rest.
+- [x] Deleting a dirty workout that is open in the draft warns before discarding edits.
+- [x] Blank routine names never blank out recorded Progress labels; duplicate suffixes keep muscle context.
+- [x] Ambiguous legacy names are not arbitrarily assigned an identity.
+- [x] A valid backup that fails to write reports a storage failure, not an invalid backup.
+- [x] Huge set counts are capped.
+- [x] Repeated reloads do not accumulate recovery copies, and corrupt drafts are reported.
+- [x] The saved theme is applied before the first visible paint.
+
+---
 
 ---
 
@@ -979,11 +984,10 @@ After applying the fixes, verify:
 These are documented in `docs/PRD.md` but are larger or lower-priority changes:
 
 - Multiple tabs are not coordinated; the last tab to write wins.
-- Duplicate workout dates from imported backups are not fully rejected (see item **26** for the edit-blocking consequence).
 - A failed draft clear after a successful save can leave a stale draft that reappears after reload.
 - There is no schema version or migration framework.
 - There is no service worker or installable offline package.
-- Recovery copies are not pruned automatically (see item **32**).
+- There is no in-app path to browse or restore recovery copies.
 - The selected Progression exercise is not persisted across reloads.
 - The chart has no axes, tooltips, or date labels.
 - Routine exercises cannot be reordered.
