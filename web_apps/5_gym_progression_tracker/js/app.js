@@ -42,6 +42,10 @@ const isCompleted = s => !!s && s.d === true && +s.r > 0;
 
 
 const ex = (n, m, a, b, c, d) => ({ id: uid(), n, m, smin: a, smax: b, rmin: c, rmax: d });
+// Planned ranges are guidance, but they must not allocate or render without a
+// bound: a corrupt import or routine edit could otherwise freeze the page.
+const MAX_PLANNED_SETS = 50;
+const MAX_PLANNED_REPS = 1000;
 const def = () => ({
     plan: {
         0: { name: 'Chest + Shoulder + Triceps', ex: [ex('Bench Press', 'Chest', 3, 4, 6, 10), ex('Incline DB Press', 'Chest', 3, 3, 8, 12), ex('Shoulder Press', 'Shoulders', 3, 4, 8, 12), ex('Lateral Raise', 'Shoulders', 3, 4, 12, 15), ex('Triceps Pushdown', 'Triceps', 3, 3, 10, 15)] },
@@ -57,6 +61,16 @@ const normBound = v => {
     const n = Math.floor(+v);
     return Number.isFinite(n) && n > 0 ? n : '';
 };
+function cappedBound(v, max, diag) {
+    const n = normBound(v);
+    if (n !== '' && n > max) {
+        if (diag) diag.clamped++;
+        return max;
+    }
+    return n;
+}
+const setBound = (v, diag) => cappedBound(v, MAX_PLANNED_SETS, diag);
+const repBound = (v, diag) => cappedBound(v, MAX_PLANNED_REPS, diag);
 function normalizeRanges(e) {
     if (e.smin !== '' && e.smax !== '' && e.smin > e.smax) e.smax = e.smin;
     if (e.rmin !== '' && e.rmax !== '' && e.rmin > e.rmax) e.rmax = e.rmin;
@@ -67,31 +81,68 @@ function fixEditedRange(e, key) {
     if (key === 'rmin' && e.rmin !== '' && e.rmax !== '' && e.rmin > e.rmax) e.rmax = e.rmin;
     if (key === 'rmax' && e.rmax !== '' && e.rmin !== '' && e.rmax < e.rmin) e.rmin = e.rmax;
 }
-function normRoutineEx(e) {
+function normRoutineEx(e, diag) {
     if (!e || typeof e !== 'object') return null;
     const name = e.n ?? e.name;
     if (!('n' in e) && !('name' in e)) return null;
-    const out = { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: typeof name === 'string' ? name : '', m: String(e.m ?? e.muscle ?? ''), smin: normBound(e.smin ?? e.minSets), smax: normBound(e.smax ?? e.maxSets), rmin: normBound(e.rmin ?? e.minReps), rmax: normBound(e.rmax ?? e.maxReps) };
+    const out = { id: (typeof e.id === 'string' && e.id) ? e.id : uid(), n: typeof name === 'string' ? name : '', m: String(e.m ?? e.muscle ?? ''), smin: setBound(e.smin ?? e.minSets, diag), smax: setBound(e.smax ?? e.maxSets, diag), rmin: repBound(e.rmin ?? e.minReps, diag), rmax: repBound(e.rmax ?? e.maxReps, diag) };
     normalizeRanges(out);
     return out
 }
-function normPlan(plan) {
+function usablePlan(plan) {
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return false;
+    return Object.keys(plan).some(k => /^[0-6]$/.test(k) || FULL.includes(k));
+}
+function normPlan(plan, diag, fallbackPlan) {
+    const source = (plan && typeof plan === 'object' && !Array.isArray(plan)) ? plan : null;
+    let fallback = null;
+    const defaults = () => (fallback || (fallback = def().plan));
+    const useDefault = !!fallbackPlan && !usablePlan(source);
     const out = {};
     for (let i = 0; i < 7; i++) {
-        const src = (plan && typeof plan === 'object') ? (plan[i] ?? plan[FULL[i]]) : null;
-        const p = (src && typeof src === 'object') ? src : {};
-        out[i] = { name: typeof p.name === 'string' ? p.name : '', ex: Array.isArray(p.ex) ? p.ex.map(normRoutineEx).filter(Boolean) : [] }
+        const hasKey = !!source && ((i in source) || (FULL[i] in source));
+        const raw = source ? (source[i] ?? source[FULL[i]]) : null;
+        let p;
+        if (useDefault) {
+            p = defaults()[i];
+            if (diag) diag.planFallback = true;
+        } else if (!hasKey) {
+            p = {};
+        } else if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            if (fallbackPlan) {
+                p = defaults()[i];
+                if (diag) diag.planFallback = true;
+            } else {
+                p = {};
+            }
+        } else {
+            p = raw;
+        }
+        out[i] = { name: typeof p.name === 'string' ? p.name : '', ex: Array.isArray(p.ex) ? p.ex.map(e => normRoutineEx(e, diag)).filter(Boolean) : [] }
     }
     return out
 }
-function normLogEx(e) {
-    if (!e || typeof e !== 'object') return null;
-    const name = e.n ?? e.name; if (typeof name !== 'string') return null;
-    return { n: name, m: String(e.m ?? e.muscle ?? ''), xid: (typeof e.xid === 'string' && e.xid) ? e.xid : '', sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: +s.w || 0, r: +s.r || 0 })).filter(s => s.r > 0) : [] }
+function normLogEx(e, diag) {
+    if (!e || typeof e !== 'object') { if (diag) diag.droppedExercises++; return null; }
+    const name = e.n ?? e.name;
+    if (typeof name !== 'string' || !name.trim()) { if (diag) diag.droppedExercises++; return null; }
+    const sets = [];
+    if (Array.isArray(e.sets)) {
+        e.sets.forEach(s => {
+            if (!s || typeof s !== 'object') { if (diag) diag.droppedSets++; return; }
+            const w = +s.w, r = +s.r;
+            if (!Number.isFinite(w) || !Number.isFinite(r) || r <= 0) { if (diag) diag.droppedSets++; return; }
+            if (w < 0 && diag) diag.clamped++;
+            sets.push({ w: Math.max(0, w), r: Math.floor(r) });
+        });
+    }
+    if (!sets.length) { if (diag) diag.droppedExercises++; return null; }
+    return { n: name, m: String(e.m ?? e.muscle ?? ''), xid: (typeof e.xid === 'string' && e.xid) ? e.xid : '', sets };
 }
-function normLog(l) {
+function normLog(l, diag) {
     if (!l || typeof l !== 'object' || !isDate(l.date)) return null;
-    return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(normLogEx).filter(Boolean) : [] }
+    if (diag && l.ex != null && !Array.isArray(l.ex)) diag.droppedExercises++;
+    return { id: safeId(l.id), date: l.date, day: FULL[wk(l.date)], year: +l.date.slice(0, 4), di: wk(l.date), name: typeof l.name === 'string' ? l.name : '', ex: Array.isArray(l.ex) ? l.ex.map(e => normLogEx(e, diag)).filter(Boolean) : [] }
 }
 function dedupeLogIds(logs) {
     const used = new Set(logs.map(l => l.id));
@@ -132,20 +183,35 @@ function reconcileLogXids(logs, remap) {
         e.xid = matches.length === 1 ? matches[0].id : ''
     }))
 }
-function normalizeData(o) {
-    const plan = normPlan(o && o.plan);
-    const logs = (o && Array.isArray(o.logs) ? o.logs : []).map(normLog).filter(Boolean).sort(byDate);
+function normalizeData(o, opts) {
+    const fallbackPlan = !opts || opts.fallbackPlan !== false;
+    const diag = { planFallback: false, droppedLogs: 0, droppedExercises: 0, droppedSets: 0, futureLogs: 0, duplicateDates: 0, clamped: 0 };
+    const plan = normPlan(o && o.plan, diag, fallbackPlan);
+    if (o && o.logs != null && !Array.isArray(o.logs)) diag.droppedLogs++;
+    const rawLogs = (o && Array.isArray(o.logs)) ? o.logs : [];
+    const seenDates = new Set();
+    const logs = [];
+    rawLogs.forEach(raw => {
+        if (!raw || typeof raw !== 'object' || !isDate(raw.date)) { diag.droppedLogs++; return; }
+        if (raw.date > today()) { diag.futureLogs++; return; }
+        if (seenDates.has(raw.date)) { diag.duplicateDates++; return; }
+        const l = normLog(raw, diag);
+        if (!l || !l.ex.length) { diag.droppedLogs++; return; }
+        seenDates.add(raw.date);
+        logs.push(l);
+    });
+    logs.sort(byDate);
     dedupeLogIds(logs);
     const remap = dedupePlanIds(plan);
     reconcileLogXids(logs, remap);
-    return { plan, logs }
+    return { plan, logs, report: diag }
 }
 function normDraft(d) {
     if (!d || typeof d !== 'object' || !isDate(d.date) || !Array.isArray(d.ex)) return null;
     return {
         date: d.date, di: wk(d.date), editId: (typeof d.editId === 'string' && d.editId) ? d.editId : '', base: (typeof d.base === 'string') ? d.base : null, baseDate: isDate(d.baseDate) ? d.baseDate : ((typeof d.base === 'string') ? d.date : ''),
         ex: d.ex.filter(e => e && typeof e === 'object').map(e => {
-            const out = { xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: normBound(e.smin), smax: normBound(e.smax), rmin: normBound(e.rmin), rmax: normBound(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] };
+            const out = { xid: (typeof e.xid === 'string') ? e.xid : '', n: String(e.n ?? ''), m: String(e.m ?? ''), smin: setBound(e.smin), smax: setBound(e.smax), rmin: repBound(e.rmin), rmax: repBound(e.rmax), on: e.on !== false, sets: Array.isArray(e.sets) ? e.sets.slice(0, MAX_PLANNED_SETS).filter(s => s && typeof s === 'object').map(s => ({ w: s.w ?? '', r: s.r ?? '', d: !!s.d })) : [] };
             normalizeRanges(out);
             return out
         })
@@ -207,34 +273,81 @@ function validateBackup(o) {
     }
     return { ok: true }
 }
-const isStrict = o => validateBackup(o).ok;
+// Imports must not silently lose data. Boot repairs legacy/partial data and
+// reports what it dropped; restore is strict and rejects the backup instead.
+function validateImport(o) {
+    const base = validateBackup(o);
+    if (!base.ok) return base;
+    const dates = new Set();
+    for (const l of o.logs) {
+        if (l.date > today()) return { ok: false, error: 'a workout date is in the future.' };
+        if (dates.has(l.date)) return { ok: false, error: 'two workouts share the date ' + l.date + '.' };
+        dates.add(l.date);
+        if (!Array.isArray(l.ex) || !l.ex.length) return { ok: false, error: 'a workout has no exercises.' };
+        for (const e of l.ex) {
+            const name = e.n ?? e.name;
+            if (typeof name !== 'string' || !name.trim()) return { ok: false, error: 'a workout exercise has no name.' };
+            if (!Array.isArray(e.sets) || !e.sets.length) return { ok: false, error: 'a workout exercise has no sets.' };
+            for (const s of e.sets) {
+                if (!s || typeof s !== 'object') return { ok: false, error: 'a set entry is invalid.' };
+                const w = +s.w, r = +s.r;
+                if (!Number.isFinite(w) || w < 0) return { ok: false, error: 'a set has an invalid weight.' };
+                if (!Number.isFinite(r) || r <= 0) return { ok: false, error: 'a set has invalid repetitions.' };
+            }
+        }
+    }
+    return { ok: true }
+}
 
 
-function recoverCopy(rawStr, why, loaded) {
+function recoverCopy(rawStr, why, loaded, prefix = 'gym_data_recovery_', label = 'workout data') {
+    const key = prefix + Date.now();
     let kept = false;
     try {
-        localStorage.setItem('gym_data_recovery_' + Date.now(), rawStr);
+        localStorage.setItem(key, rawStr);
         kept = true;
     } catch (e) { }
-    const copy = kept ? 'A recovery copy was kept in this browser.' : 'A recovery copy could not be saved in this browser.';
-    try { alert('Your saved workout data was unreadable (' + why + '). ' + copy + ' ' + loaded) } catch (e) { }
+    if (kept) {
+        // Keep the latest copy only, so repeated reloads cannot consume storage.
+        Store.keys(prefix).forEach(k => { if (k !== key) Store.remove(k) });
+    }
+    const copy = kept ? `A recovery copy was kept under "${key}" in this browser.` : 'A recovery copy could not be saved in this browser.';
+    try { alert('Your saved ' + label + ' was unreadable (' + why + '). ' + copy + ' ' + loaded) } catch (e) { }
+    return kept
 }
 function bootState() {
     const rawStr = Store.readRaw('gym_data');
     if (rawStr == null) return { S: def(), persist: true, generatedPlan: true };
     let raw; try { raw = JSON.parse(rawStr) } catch (e) { recoverCopy(rawStr, 'not valid JSON', 'Default data has been loaded.'); return { S: def(), persist: false, generatedPlan: true } }
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { recoverCopy(rawStr, 'unexpected structure', 'Default data has been loaded.'); return { S: def(), persist: false, generatedPlan: true } }
-    if (!isStrict(raw)) recoverCopy(rawStr, 'missing or malformed fields', 'The readable parts have been normalized and saved.');
-    return { S: normalizeData(raw), persist: true, generatedPlan: false }
+    const normalized = normalizeData(raw);
+    const r = normalized.report;
+    const repaired = [];
+    if (r.planFallback) repaired.push('the default routine was restored');
+    if (r.futureLogs) repaired.push(r.futureLogs + ' future-dated workout(s) were dropped');
+    if (r.duplicateDates) repaired.push(r.duplicateDates + ' duplicate-date workout(s) were dropped');
+    if (r.droppedLogs) repaired.push(r.droppedLogs + ' workout(s) were dropped');
+    if (r.droppedExercises) repaired.push(r.droppedExercises + ' exercise entr(ies) were dropped');
+    if (r.droppedSets) repaired.push(r.droppedSets + ' set entr(ies) were dropped');
+    if (r.clamped) repaired.push(r.clamped + ' oversized target(s) were capped');
+    if (repaired.length) recoverCopy(rawStr, 'missing or malformed fields', 'Readable data was normalized: ' + repaired.join('; ') + '.');
+    return { S: { plan: normalized.plan, logs: normalized.logs }, persist: true, generatedPlan: r.planFallback }
 }
 
 let S, D, tab = 'today', pick = null, planDay = null, lastKnownToday = today(), staleDraftNotice = false;
+let addName = '', addMuscle = '';
 const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
 backfillXids();
 if (boot.persist && !save()) Store.notifyStorageFailure(); // persist the plan before any draft can reference its IDs
+const draftRaw = Store.readRaw('gym_draft');
 D = normDraft(Store.loadDraft());
+if (draftRaw != null && draftRaw.trim() !== 'null' && !D) {
+    let draftWhy = 'unexpected structure';
+    try { JSON.parse(draftRaw) } catch (e) { draftWhy = 'not valid JSON' }
+    recoverCopy(draftRaw, draftWhy, 'A fresh draft has been created.', 'gym_draft_recovery_', 'workout draft');
+}
 if (boot.generatedPlan && D && remapDraftXids(D)) {
     if (!saveD()) Store.notifyStorageFailure();
 }
@@ -285,8 +398,8 @@ function lastSets(e, date, skip) {
 }
 function mk(e, date, skip) {
     const l = lastSets({ n: e.n, xid: e.id || '' }, date, skip) || [];
-    const smin = normBound(e.smin), smax = normBound(e.smax), rmin = normBound(e.rmin), rmax = normBound(e.rmax);
-    const c = Math.max(1, smin || 3);
+    const smin = setBound(e.smin), smax = setBound(e.smax), rmin = repBound(e.rmin), rmax = repBound(e.rmax);
+    const c = Math.min(MAX_PLANNED_SETS, Math.max(1, smin || 3));
     return { xid: e.id || '', n: e.n, m: e.m, smin, smax, rmin, rmax, on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
 function newDraft(di, date = today()) { staleDraftNotice = false; D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
@@ -295,7 +408,9 @@ function fromLog(l) {
     const di = wk(l.date), pl = S.plan[di]?.ex || [];
     D = {
         date: l.date, di, editId: l.id, ex: l.ex.map(e => {
-            const p = (e.xid && pl.find(x => x.id === e.xid)) || pl.find(x => x.n === e.n) || {};
+            // Only a unique routine match may upgrade a legacy name to a stable
+            // identity; ambiguous names stay name-based.
+            const p = (e.xid && pl.find(x => x.id === e.xid)) || findUniquePlanExercise(e.n) || {};
             return { xid: e.xid || p.id || '', n: e.n, m: e.m || p.m || '', smin: p.smin || '', smax: p.smax || '', rmin: p.rmin || '', rmax: p.rmax || '', on: true, sets: e.sets.map(s => ({ w: s.w, r: s.r, d: true })) }
         })
     };
@@ -305,7 +420,11 @@ function fromLog(l) {
 }
 function openDate(date) { const l = S.logs.find(x => x.date === date); l ? fromLog(l) : newDraft(wk(date), date) }
 function dateTaken(date) {
-    return S.logs.some(l => l.id !== (D.editId || '_new_') && l.date === date)
+    const editId = D.editId || null;
+    const editing = editId ? S.logs.find(l => l.id === editId) : null;
+    // Legacy/imported duplicate dates must remain editable in place.
+    if (editing && editing.date === date) return false;
+    return S.logs.some(l => l.id !== editId && l.date === date)
 }
 const dateConflictMsg = date => `Another workout already exists on ${date}. Choose another date or cancel the edit.`;
 // A saved workout keeps the name it was created with, even if it is later
@@ -391,7 +510,7 @@ function today_v() {
         h += '</div>'
     });
     const known = allEx();
-    h += `<div class="card"><b>Add exercise</b><div class="row"><input list="ex" id="nx" placeholder="Exercise name"><input id="nm" placeholder="Muscle" style="max-width:110px"></div>
+    h += `<div class="card"><b>Add exercise</b><div class="row"><input list="ex" id="nx" placeholder="Exercise name" value="${esc(addName)}"><input id="nm" placeholder="Muscle" style="max-width:110px" value="${esc(addMuscle)}"></div>
  <datalist id="ex">${Object.keys(known).map(k => `<option value="${esc(k)}">`).join('')}</datalist>
  <div class="row"><button class="btn g w" data-a="addx">+ Add to today</button></div></div>
  <button class="btn w" data-a="fin">${D.editId ? '✔ Update Workout' : '✔ Finish & Save Workout'}</button>`;
@@ -430,14 +549,19 @@ function prog_v() {
         if (g) { g.name = e.n; g.m = e.m || g.m; g.label = e.n } // S.logs is oldest-first: newest name wins
         else { const ng = { key, xid: e.xid || '', name: e.n, m: e.m, label: e.n }; byKey.set(key, ng); groups.push(ng) }
     }));
-    groups.forEach(g => { if (g.xid && planName[g.xid] != null) g.label = planName[g.xid] }); // prefer current routine name
+    groups.forEach(g => {
+        if (!g.xid) return;
+        const current = planName[g.xid]; // prefer the current routine name when it is not blank
+        if (typeof current === 'string' && current.trim()) g.label = current
+    });
     const labelCount = Object.create(null); groups.forEach(g => (labelCount[g.label] = (labelCount[g.label] || 0) + 1));
     const usedLabels = new Set();
     groups.forEach(g => {
         let label = g.label;
         if (labelCount[label] > 1) { // different identities share a name: keep the dropdown usable
-            label = g.m ? `${label} · ${g.m}` : label;
-            let i = 2; while (usedLabels.has(label)) label = `${g.label} (${i++})`
+            const base = g.m ? `${label} · ${g.m}` : label;
+            label = base;
+            let i = 2; while (usedLabels.has(label)) label = `${base} (${i++})`
         }
         usedLabels.add(label); g.label = label
     });
@@ -446,11 +570,14 @@ function prog_v() {
     const g = groups.find(x => x.key === pick) || groups[0];
     pick = g.key;
     h += `<select id="pk" style="width:100%;margin-bottom:10px">${groups.map(x => `<option value="${esc(x.key)}" ${x.key === pick ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>`;
-    const pts = S.logs.map(l => {
-        const e = l.ex.find(x => g.xid ? x.xid === g.xid : (!x.xid && x.n === g.name)); if (!e || !e.sets.length) return null;
+    // One point per date: a legacy/imported duplicate must not count as two sessions.
+    const pointByDate = new Map();
+    S.logs.forEach(l => {
+        const e = l.ex.find(x => g.xid ? x.xid === g.xid : (!x.xid && x.n === g.name)); if (!e || !e.sets.length) return;
         const top = e.sets.reduce((a, s) => s.w > a.w || (s.w === a.w && s.r > a.r) ? s : a, e.sets[0]);
-        return { d: l.date, w: top.w, r: top.r, rm: Math.max(...e.sets.map(s => s.w * (1 + s.r / 30))) }
-    }).filter(Boolean);
+        pointByDate.set(l.date, { d: l.date, w: top.w, r: top.r, rm: Math.max(...e.sets.map(s => s.w * (1 + s.r / 30))) });
+    });
+    const pts = [...pointByDate.values()];
     if (!pts.length) return h + '<div class="mu">No completed sets recorded for this exercise yet.</div>';
     const pr = pts.length ? Math.max(...pts.map(p => p.w)) : 0, rm = pts.length ? Math.max(...pts.map(p => p.rm)) : 0;
     h += `<div class="card st"><div><b>${pr}kg</b><span class="mu">Best weight</span></div><div><b>${rm.toFixed(0)}kg</b><span class="mu">Est. 1RM</span></div><div><b>${pts.length}</b><span class="mu">Sessions</span></div></div>`;
@@ -470,8 +597,8 @@ function plan_v() {
     p.ex.forEach((e, i) => {
         h += `<div class="card"><div class="hd"><b>Exercise ${i + 1}</b><button class="x" data-a="pdel" data-i="${i}">✕</button></div>
   <div class="pl"><input data-p="n" data-i="${i}" value="${esc(e.n)}" placeholder="Name"><input data-p="m" data-i="${i}" value="${esc(e.m)}" placeholder="Muscle">
-  <input type="number" min="1" step="1" data-p="smin" data-i="${i}" value="${e.smin}" placeholder="Sets min"><input type="number" min="1" step="1" data-p="smax" data-i="${i}" value="${e.smax}" placeholder="Sets max">
-  <input type="number" min="1" step="1" data-p="rmin" data-i="${i}" value="${e.rmin}" placeholder="Reps min"><input type="number" min="1" step="1" data-p="rmax" data-i="${i}" value="${e.rmax}" placeholder="Reps max"></div></div>`
+  <input type="number" min="1" step="1" data-p="smin" data-i="${i}" max="${MAX_PLANNED_SETS}" value="${e.smin}" placeholder="Sets min"><input type="number" min="1" step="1" data-p="smax" data-i="${i}" max="${MAX_PLANNED_SETS}" value="${e.smax}" placeholder="Sets max">
+  <input type="number" min="1" step="1" data-p="rmin" data-i="${i}" max="${MAX_PLANNED_REPS}" value="${e.rmin}" placeholder="Reps min"><input type="number" min="1" step="1" data-p="rmax" data-i="${i}" max="${MAX_PLANNED_REPS}" value="${e.rmax}" placeholder="Reps max"></div></div>`
     });
     h += `<button class="btn g w" data-a="padd">+ Add exercise to ${DAYS[planDay]}</button>
  <div class="card" style="margin-top:16px"><b>Backup</b><div class="mu">Data is saved in this browser only.</div>
@@ -509,6 +636,15 @@ document.addEventListener('click', async ev => {
     else if (a === 'addx') {
         const n = $('#nx').value.trim(); if (!n) return;
         const known = findUniquePlanExercise(n);
+        const lower = n.toLowerCase();
+        const existing = D.ex.find(e => (known && e.xid === known.id) || String(e.n).trim().toLowerCase() === lower);
+        if (existing) {
+            // Adding the same exercise twice would duplicate its volume and its
+            // history, so point the user at the card that already exists.
+            addName = n; addMuscle = $('#nm').value.trim();
+            alert(`"${n}" is already in this workout.`);
+            render(); return
+        }
         const m = $('#nm').value.trim() || known?.m || allEx()[n] || 'Other';
         D.ex.push(mk({
             id: known?.id,
@@ -519,6 +655,11 @@ document.addEventListener('click', async ev => {
             rmin: known?.rmin ?? '',
             rmax: known?.rmax ?? ''
         }, D.date));
+        // Clear the add form only after a successful add.
+        addName = ''; addMuscle = '';
+        const nx = $('#nx'), nm = $('#nm');
+        if (nx) nx.value = '';
+        if (nm) nm.value = '';
         if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
@@ -562,12 +703,14 @@ document.addEventListener('click', async ev => {
         tab = 'today'
     }
     else if (a === 'dl') {
-        if (confirm('Delete this workout?')) {
-            const prev = S.logs;
-            S.logs = S.logs.filter(l => l.id !== b.dataset.id);
-            if (!save()) { S.logs = prev; alert('Could not update storage; the workout was not deleted.'); return }
-            if (D && D.editId === b.dataset.id) { D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure() }
-        }
+        if (!confirm('Delete this workout?')) { render(); return }
+        // Deleting the workout that is being edited also throws away unsaved
+        // changes, so ask again before doing that.
+        if (D && D.editId === b.dataset.id && draftHasData(D) && !confirm('You have unsaved changes in this workout. Delete it and discard those changes?')) { render(); return }
+        const prev = S.logs;
+        S.logs = S.logs.filter(l => l.id !== b.dataset.id);
+        if (!save()) { S.logs = prev; alert('Could not update storage; the workout was not deleted.'); return }
+        if (D && D.editId === b.dataset.id) { D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure() }
     }
     else if (a === 'pd') { planDay = i }
     else if (a === 'pdel') { S.plan[planDay].ex.splice(i, 1); if (!save()) Store.notifyStorageFailure() }
@@ -576,14 +719,15 @@ document.addEventListener('click', async ev => {
     else if (a === 'rs') {
         const t = prompt('Paste backup JSON:'); if (!t) return;
         let o; try { o = JSON.parse(t) } catch (e) { alert('Invalid backup: not valid JSON.'); return }
-        const v = validateBackup(o);
+        const v = validateImport(o);
         if (!v.ok) { alert('Invalid backup: ' + v.error); return }
         if (!mayDiscard()) return;
-        const prev = S;
-        S = normalizeData(o);
+        const normalized = normalizeData(o, { fallbackPlan: false });
+        S = { plan: normalized.plan, logs: normalized.logs };
         backfillXids();
-        if (!save()) { S = prev; alert('Invalid backup: could not write to storage.'); return }
+        if (!save()) { D = null; alert('Backup is valid, but it could not be saved to this browser\'s storage. It stays visible until you reload.'); return }
         D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'; alert('Backup restored.')
+        if (normalized.report.clamped) alert(normalized.report.clamped + ' oversized target(s) were reduced to the supported maximum.')
     }
     else if (a === 'theme') {
         const cur = THEMES.indexOf(theme);
@@ -604,8 +748,14 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('input', ev => {
     const t = ev.target;
     if (t.dataset.f) { const s = D.ex[+t.dataset.i].sets[+t.dataset.j]; s[t.dataset.f] = t.dataset.f === 'd' ? t.checked : t.value; if (!saveD()) Store.notifyStorageFailure() }
-    else if (t.dataset.p) { const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p; e[k] = ['n', 'm'].includes(k) ? t.value : normBound(t.value); if (!save()) Store.notifyStorageFailure() }
+    else if (t.dataset.p) {
+        const pi = planDay == null ? todayIdx() : planDay; const e = S.plan[pi].ex[+t.dataset.i], k = t.dataset.p;
+        e[k] = ['n', 'm'].includes(k) ? t.value : (k === 'smin' || k === 'smax' ? setBound(t.value) : repBound(t.value));
+        if (!save()) Store.notifyStorageFailure()
+    }
     else if (t.id === 'pn') { S.plan[planDay].name = t.value; if (!save()) Store.notifyStorageFailure() }
+    else if (t.id === 'nx') { addName = t.value }
+    else if (t.id === 'nm') { addMuscle = t.value }
 });
 document.addEventListener('change', ev => {
     if (ev.target.id === 'pk') { pick = ev.target.value; render() }
@@ -614,7 +764,7 @@ document.addEventListener('change', ev => {
         if (['smin', 'smax', 'rmin', 'rmax'].includes(k)) {
             const pi = planDay == null ? todayIdx() : planDay;
             const e = S.plan[pi].ex[+ev.target.dataset.i];
-            e[k] = normBound(ev.target.value);
+            e[k] = (k === 'smin' || k === 'smax') ? setBound(ev.target.value) : repBound(ev.target.value);
             fixEditedRange(e, k);
             if (!save()) Store.notifyStorageFailure();
             const pair = { smin: 'smax', smax: 'smin', rmin: 'rmax', rmax: 'rmin' }[k];

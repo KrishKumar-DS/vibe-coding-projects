@@ -9,6 +9,17 @@ const Store = (() => {
 
     function readRaw(k) { try { return localStorage.getItem(k) } catch (e) { return null } }
     function ld(k) { const r = readRaw(k); if (r == null) return null; try { return JSON.parse(r) } catch (e) { return null } }
+    function keys(prefix) {
+        const out = [];
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k != null && (!prefix || k.startsWith(prefix))) out.push(k);
+            }
+        } catch (e) { }
+        return out;
+    }
+    function remove(k) { try { localStorage.removeItem(k); return true } catch (e) { return false } }
     function notifyStorageFailure() {
         if (storageWarned) return;
         storageWarned = true;
@@ -34,6 +45,8 @@ const Store = (() => {
         readRaw,
         ld,
         sv,
+        keys,
+        remove,
         notifyStorageFailure,
     };
 })();

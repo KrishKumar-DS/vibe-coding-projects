@@ -5,6 +5,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Gym Tracker</title>
+  <script>
+    // Apply a stored theme before the stylesheet paints, so a dark-mode user
+    // never gets a flash of the light palette on reload. The runtime app owns
+    // changes after boot; this only covers the first paint.
+    try {
+      var t = JSON.parse(localStorage.getItem('gym_theme'));
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      else if (t === 'system') document.documentElement.removeAttribute('data-theme');
+    } catch (e) { }
+  </script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
