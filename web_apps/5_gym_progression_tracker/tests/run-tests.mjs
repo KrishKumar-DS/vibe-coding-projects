@@ -19,9 +19,10 @@ let src =
   readFileSync(join(__dir, '..', 'js', 'app.js'), 'utf8');
 src += `
 ;globalThis.__api = {
-  normalizeData, validateBackup, bootState, normDraft, normLog, normLogEx,
+  normalizeData, validateBackup, validateImport, bootState, normDraft, normLog, normLogEx,
   dateForWeekday, isCompleted, draftHasData, isDate, byDate, remapDraftXids,
   getS: () => S, getD: () => D, getTab: () => tab,
+  MAX_PLANNED_SETS, MAX_PLANNED_REPS,
 };`;
 
 function makeEl(props = {}) {
@@ -43,7 +44,7 @@ const FIXED_NOW = '2026-10-13T12:00:00';
 function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } = {}) {
   const store = new Map(Object.entries(seed));
   const listeners = { click: [], input: [], change: [] };
-  const alerts = [], confirms = [], prompts = [];
+  const alerts = [], confirms = [], prompts = [], clipboard = [];
   const ctl = { confirm: true, prompt: null, failWrites, ...controls };
   const elements = new Map();
   const docEl = {
@@ -65,10 +66,17 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
         store.set(k, String(v));
       },
       removeItem: k => store.delete(k),
+      get length() { return store.size },
+      key: i => [...store.keys()][i] ?? null,
     },
-    navigator: { clipboard: { writeText: async () => { } } },
+    navigator: { clipboard: { writeText: async t => { clipboard.push(String(t)) } } },
     alert: a => alerts.push(String(a)),
-    confirm: c => { confirms.push(String(c)); return ctl.confirm; },
+    confirm: c => {
+      confirms.push(String(c));
+      if (typeof ctl.confirm === 'function') return ctl.confirm(String(c));
+      if (Array.isArray(ctl.confirm)) return ctl.confirm.length ? ctl.confirm.shift() : false;
+      return ctl.confirm;
+    },
     prompt: (msg) => { prompts.push(String(msg)); return ctl.prompt; },
     document: {
       documentElement: docEl,
@@ -98,8 +106,31 @@ function app({ seed = {}, failWrites = false, controls = {}, now = FIXED_NOW } =
   const fireInput = props => { const t = makeEl(props); listeners.input.forEach(fn => fn({ target: t })); };
   const fireChange = props => { const t = makeEl(props); listeners.change.forEach(fn => fn({ target: t })); };
 
-  return { api: sandbox.__api, store, alerts, confirms, prompts, ctl, dom: elements, docEl, fireClick, fireInput, fireChange };
+  return { api: sandbox.__api, store, alerts, confirms, prompts, clipboard, ctl, dom: elements, docEl, fireClick, fireInput, fireChange };
 }
+
+// Reboot the same browser storage into a fresh app instance. Useful for
+// proving that repaired/corrupt data is persisted (or not) across reloads.
+function reload(c, opts = {}) {
+  return app({ seed: Object.fromEntries(c.store), ...opts });
+}
+
+// Read the option labels rendered by the Progress view.
+function progressLabels(c) {
+  c.fireClick({ a: 'tab', t: 'progress' });
+  const html = c.dom.get('#v').innerHTML;
+  return [...html.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)<\/option>/g)]
+    .map(m => ({ value: m[1], label: m[2] }));
+}
+
+const readIndex = () => readFileSync(join(__dir, '..', 'index.html'), 'utf8');
+
+const futureDate = () => '2026-12-01';
+const makeLog = (id, date, ex, extra = {}) => ({
+  id, date, day: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][(new Date(date + 'T00:00:00').getDay() + 6) % 7],
+  year: +date.slice(0, 4), di: (new Date(date + 'T00:00:00').getDay() + 6) % 7, name: 'Push', ex, ...extra,
+});
+const draftSetCount = (c, i = 0) => c.api.getD().ex[i].sets.length;
 
 // ---- tiny test runner ----
 let pass = 0, fail = 0;
@@ -1156,7 +1187,9 @@ section('Bugs.md 15 — boot, theme, and recovery storage failures are reported'
 }
 {
   const c = app({ seed: { gym_data: '{}' } });
-  ok('structural recovery reports normalization, not defaults', c.alerts.some(a => /readable parts have been normalized/i.test(a)));
+  ok('structural recovery restores the default routine', c.api.getS().plan[0].ex.length > 0);
+  ok('structural recovery reports what was restored', c.alerts.some(a => /default routine was restored/i.test(a)));
+  ok('structural recovery persists the default routine', JSON.parse(c.store.get('gym_data')).plan[0].ex.length > 0);
 }
 
 // =====================================================================
@@ -1750,6 +1783,385 @@ section('Bugs.md 16 — prototype-named exercises behave like plain names');
   const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
   addExercise(c, 'constructor');
   eq('new exercise uses the recorded muscle for "constructor"', c.api.getD().ex.at(-1).m, 'Chest');
+}
+
+// =====================================================================
+section('Bug #18 — boot repairs invalid plans without losing usable logs');
+const validPlan = () => JSON.parse(DEFAULTS).plan;
+const restorePayload = (c, payload) => {
+  c.ctl.prompt = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  c.fireClick({ a: 'rs' });
+};
+{
+  const c = app({ seed: { gym_data: '{}' } });
+  ok('invalid stored plan does not erase the default routine', c.api.getS().plan[0].ex.length > 0);
+  ok('repaired default routine is persisted', JSON.parse(c.store.get('gym_data')).plan[0].ex.length > 0);
+}
+{
+  const log = makeLog('kept', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: 'bad', logs: [log] }) } });
+  eq('structurally invalid boot data preserves usable logs', c.api.getS().logs.map(l => l.id), ['kept']);
+  ok('structurally invalid boot data restores a default plan', c.api.getS().plan[0].ex.length > 0);
+  ok('boot states which parts were recovered', /default routine was restored/i.test(c.alerts.join(' ')));
+}
+
+// =====================================================================
+section('Bug #18 — malformed logs are rejected on restore and reported on boot');
+{
+  const bad = { plan: validPlan(), logs: [makeLog('bad', '2026-10-05', [{ m: 'Chest', sets: [{ w: 50, r: 5 }] }])] };
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const before = JSON.stringify(c.api.getS());
+  restorePayload(c, bad);
+  ok('restore rejects a nameless log exercise', c.alerts.some(a => /Invalid backup.*no name/i.test(a)), c.alerts);
+  eq('rejected nameless exercise leaves state unchanged', JSON.stringify(c.api.getS()), before);
+}
+{
+  const bad = { plan: validPlan(), logs: [makeLog('bad', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 70, r: 'Infinity' }] }])] };
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  restorePayload(c, bad);
+  ok('restore rejects non-finite set entries', c.alerts.some(a => /Invalid backup.*repetitions/i.test(a)), c.alerts);
+}
+{
+  const bad = { plan: validPlan(), logs: [makeLog('empty', '2026-10-05', [])] };
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  restorePayload(c, bad);
+  ok('restore rejects an empty workout', c.alerts.some(a => /Invalid backup.*no exercises/i.test(a)), c.alerts);
+}
+{
+  const log = makeLog('partial', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [null, { w: 70 }, { w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [log] }) } });
+  eq('boot keeps the usable set', c.api.getS().logs[0].ex[0].sets, [{ w: 80, r: 5 }]);
+  ok('boot reports malformed entries instead of silently dropping them', /2 set entr\(ies\) were dropped/i.test(c.alerts.join(' ')), c.alerts);
+}
+{
+  const payload = { plan: validPlan(), logs: [makeLog('bad', '2026-10-05', [{ m: 'Chest', sets: [{ w: 50, r: 5 }] }])] };
+  const boot = app({ seed: { gym_data: JSON.stringify(payload) } });
+  const restored = app({ seed: { gym_data: DEFAULTS } });
+  restorePayload(restored, payload);
+  ok('boot and restore both reject a nameless log exercise', boot.api.getS().logs.length === 0 && restored.alerts.some(a => /no name/i.test(a)));
+}
+
+// =====================================================================
+section('Bug #18 — future-dated workouts never appear');
+{
+  const future = makeLog('future', futureDate(), [{ n: 'Future Lift', m: 'Chest', sets: [{ w: 50, r: 5 }] }]);
+  const past = makeLog('past', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [past, future] }) } });
+  eq('boot drops future-dated workouts with a warning', c.api.getS().logs.map(l => l.id), ['past']);
+  ok('future-date drop is reported', /future-dated/i.test(c.alerts.join(' ')), c.alerts);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const before = JSON.stringify(c.api.getS());
+  restorePayload(c, { plan: validPlan(), logs: [makeLog('future', futureDate(), [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }])] });
+  ok('restore rejects future-dated workouts', c.alerts.some(a => /Invalid backup.*future/i.test(a)), c.alerts);
+  eq('rejected future workout leaves state unchanged', JSON.stringify(c.api.getS()), before);
+}
+{
+  const future = makeLog('future', futureDate(), [{ n: 'Future Lift', m: 'Chest', sets: [{ w: 50, r: 5 }] }]);
+  const past = makeLog('past', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [past, future] }) } });
+  c.fireClick({ a: 'tab', t: 'history' });
+  ok('History contains no future sessions after boot', !c.dom.get('#v').innerHTML.includes(futureDate()));
+  ok('Progress contains no future sessions after boot', !progressLabels(c).some(o => /Future Lift/.test(o.label)));
+}
+
+// =====================================================================
+section('Bug #18 — a valid backup that cannot be saved is not called invalid');
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const payload = { plan: validPlan(), logs: [makeLog('restored', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }])] };
+  c.ctl.failWrites = true;
+  restorePayload(c, payload);
+  const msg = c.alerts.join(' ');
+  ok('a valid backup whose write fails reports a storage failure', /Backup is valid.*could not be saved/i.test(msg), c.alerts);
+  ok('a storage failure is not reported as an invalid backup', !/Invalid backup/i.test(msg), c.alerts);
+  eq('the validated backup stays visible in memory', c.api.getS().logs.map(l => l.id), ['restored']);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  restorePayload(c, 'not json{');
+  ok('a validation failure still reports an invalid backup', c.alerts.some(a => /Invalid backup.*not valid JSON/i.test(a)), c.alerts);
+}
+
+// =====================================================================
+section('Bug #18 — adding an exercise twice does not duplicate it');
+{
+  const c = app({});
+  const before = c.api.getD().ex.length;
+  addExercise(c, 'Lat Pulldown');
+  eq('adding an exercise already in the draft does not create a duplicate', c.api.getD().ex.length, before);
+  ok('duplicate add explains why nothing happened', /already in this workout/i.test(c.alerts.join(' ')), c.alerts);
+  eq('duplicate add keeps the entered name for correction', c.dom.get('#nx').value, 'Lat Pulldown');
+}
+{
+  const c = app({});
+  addExercise(c, 'Lat Pulldown');
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '60' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  const rec = c.api.getS().logs[0];
+  eq('duplicate add does not double history volume', rec.ex.length, 1);
+  eq('duplicate add saves the single exercise volume', rec.ex[0].sets.reduce((sum, s) => sum + s.w * s.r, 0), 480);
+}
+{
+  const c = app({});
+  addExercise(c, 'Cable Fly');
+  eq('add form clears the name after a successful add', c.dom.get('#nx').value, '');
+  eq('add form clears the muscle after a successful add', c.dom.get('#nm').value, '');
+  ok('the added exercise is in the draft', c.api.getD().ex.some(e => e.n === 'Cable Fly'));
+}
+{
+  const c = app({});
+  c.fireInput({ id: 'nx', value: 'Cable Fly' });
+  c.fireInput({ id: 'nm', value: 'Chest' });
+  c.fireClick({ a: 'tab', t: 'routine' });
+  c.fireClick({ a: 'tab', t: 'today' });
+  const html = c.dom.get('#v').innerHTML;
+  ok('unsubmitted add text survives incidental re-renders', html.includes('value="Cable Fly"') && html.includes('value="Chest"'));
+}
+
+// =====================================================================
+section('Bug #18 — duplicate workout dates are rejected or edited in place');
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const before = JSON.stringify(c.api.getS());
+  restorePayload(c, {
+    plan: validPlan(),
+    logs: [
+      makeLog('a', '2026-10-12', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]),
+      makeLog('b', '2026-10-12', [{ n: 'Squat', m: 'Legs', sets: [{ w: 85, r: 5 }] }]),
+    ],
+  });
+  ok('restore rejects duplicate workout dates', c.alerts.some(a => /Invalid backup.*share the date/i.test(a)), c.alerts);
+  eq('rejected duplicate dates leave state unchanged', JSON.stringify(c.api.getS()), before);
+}
+{
+  const logs = [
+    makeLog('first', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]),
+    makeLog('second', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 90, r: 5 }] }]),
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs }) } });
+  eq('boot keeps the first duplicate-date workout', c.api.getS().logs.map(l => l.id), ['first']);
+  ok('boot warns about the dropped duplicate date', /duplicate-date/i.test(c.alerts.join(' ')), c.alerts);
+}
+{
+  const log = makeLog('only', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [log] }) } });
+  c.fireClick({ a: 'edit', id: 'only' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '6' });
+  c.fireClick({ a: 'fin' });
+  eq('an existing workout can be edited in place on its own date', c.api.getS().logs[0].ex[0].sets[0].r, 6);
+  eq('in-place editing does not create a second record', c.api.getS().logs.length, 1);
+}
+{
+  const logs = [
+    makeLog('a', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]),
+    makeLog('b', '2026-10-06', [{ n: 'Squat', m: 'Legs', sets: [{ w: 85, r: 5 }] }]),
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs }) } });
+  c.fireClick({ a: 'edit', id: 'a' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  ok('moving onto another occupied date is still blocked', /already exists/i.test(c.alerts.join(' ')), c.alerts);
+  eq('blocked move leaves the original date alone', c.api.getS().logs.find(l => l.id === 'a').date, '2026-10-05');
+}
+
+// =====================================================================
+section('Bug #18 — deleting a dirty edited workout asks twice');
+{
+  const log = makeLog('l1', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [log] }) } });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.ctl.confirm = [true, false];
+  c.fireClick({ a: 'dl', id: 'l1' });
+  eq('deleting a dirty edited workout warns about unsaved changes', c.confirms.length, 2);
+  ok('the second prompt mentions unsaved changes', /unsaved changes/i.test(c.confirms[1]), c.confirms);
+  eq('cancelling the unsaved warning keeps the workout', c.api.getS().logs.map(l => l.id), ['l1']);
+  ok('cancelling the unsaved warning keeps the draft', c.api.getD().editId === 'l1' && c.api.draftHasData(c.api.getD()));
+}
+{
+  const log = makeLog('l1', '2026-10-05', [{ n: 'Squat', m: 'Legs', sets: [{ w: 80, r: 5 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: validPlan(), logs: [log] }) } });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '9' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.ctl.confirm = [true, true];
+  c.fireClick({ a: 'dl', id: 'l1' });
+  eq('confirming both deletions removes the workout', c.api.getS().logs.length, 0);
+  ok('confirming both deletions clears the edited draft', c.api.getD() === null && c.store.get('gym_draft') === 'null');
+}
+
+// =====================================================================
+section('Bug #18 — Progress labels stay readable for blank and duplicate names');
+{
+  const plan = validPlan();
+  plan[0].ex = [{ id: 'e1', n: '', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }];
+  const logs = [makeLog('l1', '2026-10-05', [{ n: 'Bench Press', m: 'Chest', xid: 'e1', sets: [{ w: 100, r: 5 }] }])];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('a blank routine name keeps the recorded Progress label', progressLabels(c).map(o => o.label), ['Bench Press']);
+}
+{
+  const plan = validPlan();
+  plan[0].ex = [
+    { id: 'd1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'd2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const logs = [
+    makeLog('l1', '2026-10-05', [{ n: 'Bench Press', m: 'Chest', xid: 'd1', sets: [{ w: 100, r: 5 }] }]),
+    makeLog('l2', '2026-10-06', [{ n: 'Bench Press', m: 'Chest', xid: 'd2', sets: [{ w: 90, r: 5 }] }]),
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('duplicate labels keep muscle context and stay distinct', progressLabels(c).map(o => o.label), ['Bench Press · Chest', 'Bench Press · Chest (2)']);
+}
+{
+  const plan = validPlan();
+  plan[0].ex = [{ id: 'e1', n: '', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }];
+  const logs = [
+    makeLog('l1', '2026-10-05', [{ n: 'Lift', m: 'Chest', xid: 'e1', sets: [{ w: 50, r: 5 }] }]),
+    makeLog('l2', '2026-10-06', [{ n: 'Lift', m: 'Back', xid: 'missing', sets: [{ w: 60, r: 5 }] }]),
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  const labels = progressLabels(c).map(o => o.label);
+  eq('every valid Progress group has a label', labels.length, 2);
+  ok('no Progress group renders an empty label', labels.every(l => l.trim()), labels);
+}
+
+// =====================================================================
+section('Bug #18 — ambiguous legacy names stay unmerged');
+{
+  const plan = validPlan();
+  plan[0].ex = [
+    { id: 'a1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'a2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const logs = [makeLog('legacy', '2026-10-05', [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 100, r: 5 }] }])];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'edit', id: 'legacy' });
+  eq('ambiguous legacy names stay name-based after edit', c.api.getD().ex[0].xid, '');
+  c.fireClick({ a: 'fin' });
+  eq('ambiguous legacy edit keeps its unlinked identity', c.api.getS().logs[0].ex[0].xid, '');
+}
+{
+  const plan = validPlan();
+  plan[0].ex = [{ id: 'unique', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }];
+  const logs = [makeLog('legacy', '2026-10-05', [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 100, r: 5 }] }])];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  c.fireClick({ a: 'edit', id: 'legacy' });
+  eq('a unique legacy name upgrades to the routine identity', c.api.getD().ex[0].xid, 'unique');
+  c.fireClick({ a: 'fin' });
+  eq('the saved unique-name workout keeps the routine identity', c.api.getS().logs[0].ex[0].xid, 'unique');
+}
+{
+  const plan = validPlan();
+  plan[0].ex = [
+    { id: 'a1', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+    { id: 'a2', n: 'Bench Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+  ];
+  const logs = [
+    makeLog('legacy', '2026-10-05', [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 100, r: 5 }] }]),
+    makeLog('linked', '2026-10-06', [{ n: 'Bench Press', m: 'Chest', xid: 'a1', sets: [{ w: 90, r: 5 }] }]),
+  ];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) } });
+  eq('ambiguous legacy data starts with two Progress groups', progressLabels(c).length, 2);
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.fireClick({ a: 'edit', id: 'legacy' });
+  c.fireClick({ a: 'fin' });
+  eq('ambiguous legacy edit does not merge Progress groups', progressLabels(c).length, 2);
+}
+
+// =====================================================================
+section('Bug #18 — planned set and rep caps are enforced');
+{
+  const c = app({});
+  const result = c.api.normalizeData({
+    plan: { 0: { name: 'Huge', ex: [{ id: 'h', n: 'Squat', m: 'Legs', smin: 1000000, smax: 1000000, rmin: 1000000, rmax: 1000000 }] } },
+    logs: [],
+  });
+  const e = result.plan[0].ex[0];
+  ok('huge planned set counts are capped during normalization', e.smin <= c.api.MAX_PLANNED_SETS && e.smax <= c.api.MAX_PLANNED_SETS, e);
+  ok('huge planned rep counts are capped during normalization', e.rmin <= c.api.MAX_PLANNED_REPS && e.rmax <= c.api.MAX_PLANNED_REPS, e);
+}
+{
+  const plan = validPlan();
+  plan[0].ex = [{ id: 'h', n: 'Squat', m: 'Legs', smin: 1000000, smax: 1000000, rmin: 1000000, rmax: 1000000 }];
+  const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [] }) } });
+  c.fireClick({ a: 'day', i: '0' });
+  eq('opening a routine with a huge planned count allocates only the cap', draftSetCount(c), 50);
+  ok('the capped draft still renders', c.dom.get('#v').innerHTML.includes('Squat'));
+}
+{
+  const c = app({});
+  c.fireClick({ a: 'tab', t: 'routine' });
+  const html = c.dom.get('#v').innerHTML;
+  ok('routine set inputs expose the set cap', /data-p="smin"[^>]*max="50"/.test(html) && /data-p="smax"[^>]*max="50"/.test(html), html.slice(0, 0));
+  ok('routine rep inputs expose the rep cap', /data-p="rmin"[^>]*max="1000"/.test(html) && /data-p="rmax"[^>]*max="1000"/.test(html));
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  const plan = validPlan();
+  plan[0].ex = [{ id: 'h', n: 'Squat', m: 'Legs', smin: 1000000, smax: 1000000, rmin: 8, rmax: 10 }];
+  restorePayload(c, { plan, logs: [] });
+  eq('oversized imported values are clamped', c.api.getS().plan[0].ex[0].smin, 50);
+  ok('oversized imported values are clamped with a warning', /reduced to the supported maximum/i.test(c.alerts.join(' ')), c.alerts);
+}
+
+// =====================================================================
+section('Bug #18 — recovery copies stay bounded and recoverable');
+{
+  const raw = '{{not json';
+  const c = app({ seed: { gym_data: raw } });
+  const c2 = reload(c, { now: '2026-10-14T12:00:00' });
+  const c3 = reload(c2, { now: '2026-10-15T12:00:00' });
+  const keys = [...c3.store.keys()].filter(k => k.startsWith('gym_data_recovery_'));
+  eq('repeated corrupt-data reloads keep one recovery copy', keys.length, 1);
+  eq('corrupt stored data remains recoverable', c3.store.get(keys[0]), raw);
+  ok('the recovery warning explains how to recover', c3.alerts.some(a => /recovery copy was kept under "gym_data_recovery_/i.test(a) && /browser/i.test(a)), c3.alerts);
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: '{bad' } });
+  const keys = [...c.store.keys()].filter(k => k.startsWith('gym_draft_recovery_'));
+  eq('a corrupt draft is reported instead of silently replaced', keys.length, 1);
+  eq('the corrupt draft is preserved for recovery', c.store.get(keys[0]), '{bad');
+  ok('the corrupt-draft warning names the draft', /workout draft/i.test(c.alerts.join(' ')), c.alerts);
+  eq('a corrupt draft is replaced with a usable fresh draft', JSON.parse(c.store.get('gym_draft')).date, '2026-10-13');
+}
+{
+  const c = app({ seed: { gym_data: DEFAULTS, gym_draft: '{bad' } });
+  c.store.set('gym_draft', '{bad again');
+  const c2 = reload(c, { now: '2026-10-14T12:00:00' });
+  c2.store.set('gym_draft', '{bad once more');
+  const c3 = reload(c2, { now: '2026-10-15T12:00:00' });
+  eq('draft recovery copies also stay bounded', [...c3.store.keys()].filter(k => k.startsWith('gym_draft_recovery_')).length, 1);
+}
+
+// =====================================================================
+section('Bug #18 — backup payload and theme bootstrap');
+{
+  const c = app({ seed: { gym_data: DEFAULTS } });
+  c.fireClick({ a: 'bk' });
+  const payload = JSON.parse(c.clipboard[0]);
+  eq('a backup contains only workout data', Object.keys(payload).sort(), ['logs', 'plan']);
+  ok('a backup excludes the theme and draft', !('gym_theme' in payload) && !('gym_draft' in payload));
+}
+{
+  const html = readIndex();
+  const head = html.slice(0, html.indexOf('</head>'));
+  const script = head.slice(head.indexOf('<script>') + 8, head.indexOf('</script>'));
+  ok('index.html bootstraps the theme before CSS', head.includes('gym_theme') && head.indexOf('gym_theme') < head.indexOf('css/style.css'));
+  ok('the theme bootstrap accepts only supported themes', ['light', 'dark', 'system'].every(t => script.includes(`'${t}'`)), script);
+  ok('the theme bootstrap sets data-theme before first paint', script.includes('data-theme'));
+  const runBootstrap = stored => {
+    const doc = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v }, removeAttribute(k) { delete this.attrs[k] } };
+    vm.runInNewContext(script, { localStorage: { getItem: () => stored }, document: { documentElement: doc } });
+    return doc.attrs['data-theme'];
+  };
+  eq('the bootstrap applies a stored dark theme', runBootstrap(JSON.stringify('dark')), 'dark');
+  eq('the bootstrap applies a stored light theme', runBootstrap(JSON.stringify('light')), 'light');
+  eq('the bootstrap leaves system mode to the OS', runBootstrap(JSON.stringify('system')), undefined);
+  eq('the bootstrap ignores unsupported stored values', runBootstrap('"neon"'), undefined);
 }
 
 // =====================================================================
