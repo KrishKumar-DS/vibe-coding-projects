@@ -21,7 +21,7 @@ src += `
 ;globalThis.__api = {
   normalizeData, validateBackup, validateImport, bootState, normDraft, normLog, normLogEx,
   dateForWeekday, isCompleted, draftHasData, isDate, byDate, remapDraftXids,
-  getS: () => S, getD: () => D, getTab: () => tab,
+  getS: () => S, getD: () => D, getTab: () => tab, getPendingMove: () => pendingMove,
   MAX_PLANNED_SETS, MAX_PLANNED_REPS,
 };`;
 
@@ -425,6 +425,8 @@ section('Bug 5 — edit keeps identity; date conflicts are blocked');
   const c = app({ seed: { gym_data: JSON.stringify({ plan, logs: [seedLog] }) } });
   c.fireClick({ a: 'edit', id: 'a1' });
   c.fireChange({ id: 'dt', value: '2026-10-13' });
+  eq('date change while editing only proposes the move', c.api.getPendingMove(), '2026-10-13');
+  c.fireClick({ a: 'move' });
   eq('editing keeps identity across date change', c.api.getD().editId, 'a1');
   c.fireClick({ a: 'fin' });
   eq('date change updates the SAME record (no duplicate)', c.api.getS().logs.map(l => l.id), ['a1']);
@@ -439,6 +441,7 @@ section('Bug 5 — edit keeps identity; date conflicts are blocked');
   c.fireClick({ a: 'edit', id: 'a1' });
   c.fireChange({ id: 'dt', value: '2026-10-13' });
   ok('conflict blocked with message', c.alerts.some(a => a.includes('Another workout already exists')));
+  eq('conflict does not create a move proposal', c.api.getPendingMove(), null);
   eq('original edit date preserved', c.api.getD().date, '2026-10-12');
   c.fireClick({ a: 'fin' });
   eq('both records intact after conflict', c.api.getS().logs.map(l => l.id).sort(), ['a1', 'b1']);
@@ -469,6 +472,8 @@ section('Bugs.md 7 — weekday chips block occupied dates while editing');
   const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs }) } });
   c.fireClick({ a: 'edit', id: 'wed' });
   c.fireClick({ a: 'day', i: '1' });
+  eq('free chip proposes the new date', c.api.getPendingMove(), '2026-10-06');
+  c.fireClick({ a: 'move' });
   eq('free chip moves the edit date', c.api.getD().date, '2026-10-06');
   eq('free chip updates the weekday index', c.api.getD().di, 1);
 }
@@ -494,6 +499,7 @@ const mondayLog = (name = 'Routine A') => ({
   const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) } });
   c.fireClick({ a: 'edit', id: 'a1' });
   c.fireChange({ id: 'dt', value: '2026-10-13' }); // Tuesday
+  c.fireClick({ a: 'move' });
   const html = c.dom.get('#v').innerHTML;
   ok('edit header keeps the original routine name', html.includes('Routine A'));
   ok('edit header does not adopt the destination routine name', !html.includes('Back + Biceps'));
@@ -508,6 +514,7 @@ const mondayLog = (name = 'Routine A') => ({
   const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog()] }) } });
   c.fireClick({ a: 'edit', id: 'a1' });
   c.fireClick({ a: 'day', i: '1' }); // Tuesday chip
+  c.fireClick({ a: 'move' });
   eq('chip moves edit to Tuesday', c.api.getD().date, '2026-10-13');
   c.fireClick({ a: 'fin' });
   const rec = c.api.getS().logs[0];
@@ -518,6 +525,7 @@ const mondayLog = (name = 'Routine A') => ({
   const c = app({ seed: { gym_data: JSON.stringify({ plan: NAME_PLAN, logs: [mondayLog('')] }) } });
   c.fireClick({ a: 'edit', id: 'a1' });
   c.fireChange({ id: 'dt', value: '2026-10-13' });
+  c.fireClick({ a: 'move' });
   c.fireClick({ a: 'fin' });
   eq('a blank original name stays blank', c.api.getS().logs[0].name, '');
 }
@@ -684,6 +692,7 @@ const twoLogSeed = () => ({
   const c = app({ seed: twoLogSeed() });
   c.fireClick({ a: 'edit', id: 'l1' });
   c.fireChange({ id: 'dt', value: '2026-10-06' });
+  c.fireClick({ a: 'move' });
   ok('date-only move makes the edit draft dirty', c.api.draftHasData(c.api.getD()) === true);
   c.fireClick({ a: 'tab', t: 'history' });
   c.ctl.confirm = false;
@@ -697,6 +706,7 @@ const twoLogSeed = () => ({
   const c = app({ seed: twoLogSeed() });
   c.fireClick({ a: 'edit', id: 'l1' });
   c.fireChange({ id: 'dt', value: '2026-10-06' });
+  c.fireClick({ a: 'move' });
   c.fireClick({ a: 'tab', t: 'history' });
   c.ctl.confirm = true;
   c.fireClick({ a: 'edit', id: 'l2' });
@@ -709,8 +719,10 @@ const twoLogSeed = () => ({
   const c = app({ seed: twoLogSeed() });
   c.fireClick({ a: 'edit', id: 'l1' });
   c.fireChange({ id: 'dt', value: '2026-10-06' });
+  c.fireClick({ a: 'move' });
   ok('date-only move is dirty before revert', c.api.draftHasData(c.api.getD()) === true);
   c.fireChange({ id: 'dt', value: '2026-10-05' });
+  c.fireClick({ a: 'move' });
   ok('date reverted to baseline -> clean again', c.api.draftHasData(c.api.getD()) === false);
 }
 {
@@ -718,6 +730,7 @@ const twoLogSeed = () => ({
   const c = app({ seed: twoLogSeed() });
   c.fireClick({ a: 'edit', id: 'l1' });
   c.fireClick({ a: 'day', i: '1' }); // Monday 10-05 -> Tuesday 10-06
+  c.fireClick({ a: 'move' });
   eq('chip move while editing -> date changed', c.api.getD().date, '2026-10-06');
   ok('chip move while editing -> draft dirty', c.api.draftHasData(c.api.getD()) === true);
 }
@@ -726,6 +739,7 @@ const twoLogSeed = () => ({
   const c = app({ seed: twoLogSeed() });
   c.fireClick({ a: 'edit', id: 'l1' });
   c.fireChange({ id: 'dt', value: '2026-10-06' });
+  c.fireClick({ a: 'move' });
   const c2 = app({ seed: { gym_data: c.store.get('gym_data'), gym_draft: c.store.get('gym_draft') } });
   eq('reload keeps moved date', c2.api.getD().date, '2026-10-06');
   eq('reload keeps date baseline', c2.api.getD().baseDate, '2026-10-05');
@@ -741,6 +755,7 @@ const twoLogSeed = () => ({
   ok('legacy baseline draft loads clean', c.api.draftHasData(c.api.getD()) === false);
   eq('legacy baseline draft upgrades baseDate', c.api.getD().baseDate, c.api.getD().date);
   c.fireChange({ id: 'dt', value: '2026-10-04' });
+  c.fireClick({ a: 'move' });
   ok('upgraded legacy draft detects a date move', c.api.draftHasData(c.api.getD()) === true);
 }
 
@@ -769,6 +784,7 @@ section('Date selector — future weekdays disabled, correct weekday mapping');
   const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [log] }) } });
   c.fireClick({ a: 'edit', id: 'x' });
   c.fireClick({ a: 'day', i: '2' });
+  c.fireClick({ a: 'move' });
   eq('editing past week -> Wed chip selects past Wed (10-07)', c.api.getD().date, '2026-10-07');
 }
 
@@ -881,6 +897,190 @@ const setPastDate = (c, v) => c.dom.set('#pd', makeEl({ id: 'pd', value: v }));
   eq('same-date action skips the discard prompt', c.confirms.length, 0);
   eq('same-date action keeps the typed reps', c.api.getD().ex[0].sets[0].r, '7');
   eq('same-date action switches to Today', c.api.getTab(), 'today');
+}
+
+// =====================================================================
+section('Bugs.md 20 — edit-mode date changes require an explicit move and can be cancelled');
+const moveSeed = () => ({
+  gym_data: JSON.stringify({
+    plan: JSON.parse(DEFAULTS).plan,
+    logs: [
+      { id: 'l1', date: '2026-10-05', day: 'Monday', year: 2026, di: 0, name: 'Routine A', ex: [{ n: 'Bench Press', m: 'Chest', xid: '', sets: [{ w: 60, r: 8 }] }] },
+      { id: 'l2', date: '2026-10-06', day: 'Tuesday', year: 2026, di: 1, name: 'Routine B', ex: [{ n: 'Squat', m: 'Legs', xid: '', sets: [{ w: 80, r: 5 }] }] },
+    ],
+  }),
+});
+{
+  // a date change is only a proposal: nothing moves and nothing is saved
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  eq('picker records a move proposal', c.api.getPendingMove(), '2026-10-07');
+  eq('proposal keeps the draft on its original date', c.api.getD().date, '2026-10-05');
+  eq('proposal keeps the edit link', c.api.getD().editId, 'l1');
+  eq('a free target raises no alert', c.alerts.length, 0);
+  ok('the choice card is rendered', c.dom.get('#v').innerHTML.includes('Move this workout to'));
+  eq('saved workouts are untouched', c.api.getS().logs.map(l => l.date), ['2026-10-05', '2026-10-06']);
+  eq('stored draft still has the original date', JSON.parse(c.store.get('gym_draft')).date, '2026-10-05');
+}
+{
+  // Move workout applies the date to the draft; the record changes on Update
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.fireClick({ a: 'move' });
+  eq('Move applies the proposed date', c.api.getD().date, '2026-10-07');
+  eq('Move updates the weekday index', c.api.getD().di, 2);
+  eq('Move clears the proposal', c.api.getPendingMove(), null);
+  eq('record still waits for Update', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+  const html = c.dom.get('#v').innerHTML;
+  ok('the move note is shown after confirmation', html.includes('This workout moves from') && html.includes('when you press Update'));
+  c.fireClick({ a: 'fin' });
+  const rec = c.api.getS().logs.find(l => l.id === 'l1');
+  eq('Update writes the new date on the same record', rec.date, '2026-10-07');
+  eq('Update does not duplicate the workout', c.api.getS().logs.length, 2);
+  eq('Update keeps the record id and name', [rec.id, rec.name], ['l1', 'Routine A']);
+}
+{
+  // the weekday-chip path uses the same proposal flow
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireClick({ a: 'day', i: '2' });
+  eq('chip proposes the target date', c.api.getPendingMove(), '2026-10-07');
+  eq('chip alone does not move the draft', c.api.getD().date, '2026-10-05');
+  c.fireClick({ a: 'move' });
+  eq('confirmed chip move applies', c.api.getD().date, '2026-10-07');
+}
+{
+  // Keep editing dismisses the proposal without changing anything
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.fireClick({ a: 'pkeep' });
+  eq('Keep editing clears the proposal', c.api.getPendingMove(), null);
+  eq('Keep editing keeps the draft date', c.api.getD().date, '2026-10-05');
+  ok('Keep editing hides the card', !c.dom.get('#v').innerHTML.includes('Move this workout to'));
+  eq('Keep editing persists the original draft date', JSON.parse(c.store.get('gym_draft')).date, '2026-10-05');
+}
+{
+  // Start new here leaves the record alone and begins a separate workout
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.fireClick({ a: 'newhere' });
+  ok('Start new leaves edit mode', !c.api.getD().editId);
+  eq('Start new opens the target date', c.api.getD().date, '2026-10-07');
+  eq('Start new uses the target weekday', c.api.getD().di, 2);
+  eq('Start new loads that weekday routine', c.api.getD().ex.length, c.api.getS().plan[2].ex.length);
+  eq('Start new clears the proposal', c.api.getPendingMove(), null);
+  eq('saved record stays on its original date', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '50' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '10' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('Start new creates a third workout', c.api.getS().logs.length, 3);
+  const added = c.api.getS().logs.find(l => l.date === '2026-10-07');
+  ok('Start new creates a new record with a new id', !!added && added.id !== 'l1');
+  eq('the original record is unchanged', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+}
+{
+  // dirty edit + Start new: cancellation keeps the edit and the proposal
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '75' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'newhere' });
+  eq('cancelled Start new asks first', c.confirms.length, 1);
+  eq('cancelled Start new keeps the edit', c.api.getD().editId, 'l1');
+  eq('cancelled Start new keeps the typed weight', c.api.getD().ex[0].sets[0].w, '75');
+  eq('cancelled Start new keeps the proposal', c.api.getPendingMove(), '2026-10-07');
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'newhere' });
+  ok('confirmed Start new discards the edit draft', !c.api.getD().editId);
+  eq('confirmed Start new opens the target date', c.api.getD().date, '2026-10-07');
+  eq('confirmed Start new leaves the record untouched', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+}
+{
+  // an occupied target is rejected before a proposal is recorded
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-06' });
+  ok('occupied target is blocked with a message', c.alerts.some(a => a.includes('Another workout already exists')));
+  eq('occupied target makes no proposal', c.api.getPendingMove(), null);
+  eq('occupied target keeps the draft date', c.api.getD().date, '2026-10-05');
+}
+{
+  // Cancel edit, clean draft: no prompt, record untouched, History shown
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireClick({ a: 'cedit' });
+  eq('clean Cancel edit does not prompt', c.confirms.length, 0);
+  eq('Cancel edit clears the draft', c.api.getD(), null);
+  eq('Cancel edit returns to History', c.api.getTab(), 'history');
+  eq('Cancel edit leaves the record untouched', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+  eq('Cancel edit clears the stored draft', JSON.parse(c.store.get('gym_draft')), null);
+}
+{
+  // Cancel edit, dirty draft: cancel keeps everything, confirm discards it
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '75' });
+  c.ctl.confirm = false;
+  c.fireClick({ a: 'cedit' });
+  eq('dirty Cancel edit asks first', c.confirms.length, 1);
+  ok('cancelled Cancel edit keeps the edit', !!c.api.getD() && c.api.getD().editId === 'l1');
+  eq('cancelled Cancel edit keeps the typed weight', c.api.getD().ex[0].sets[0].w, '75');
+  c.ctl.confirm = true;
+  c.fireClick({ a: 'cedit' });
+  eq('confirmed Cancel edit clears the draft', c.api.getD(), null);
+  eq('confirmed Cancel edit does not change the record', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+  eq('confirmed Cancel edit goes to History', c.api.getTab(), 'history');
+}
+{
+  // Update is blocked while the user has not chosen what the date change means
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.fireClick({ a: 'fin' });
+  ok('Update is blocked while a proposal is pending', c.alerts.some(a => a.includes('before saving')));
+  eq('blocked Update keeps the proposal', c.api.getPendingMove(), '2026-10-07');
+  eq('blocked Update does not save', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
+  ok('blocked Update keeps the edit draft', !!c.api.getD() && c.api.getD().editId === 'l1');
+}
+{
+  // the proposal is transient: a reload drops it and keeps the draft date
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '75' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  const c2 = reload(c);
+  eq('reload drops the proposal', c2.api.getPendingMove(), null);
+  eq('reload keeps the draft date', c2.api.getD().date, '2026-10-05');
+  ok('reload does not render the choice card', !c2.dom.get('#v').innerHTML.includes('Move this workout to'));
+}
+{
+  // switching tabs does not silently dismiss or apply the proposal
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireChange({ id: 'dt', value: '2026-10-07' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  c.fireClick({ a: 'tab', t: 'today' });
+  eq('proposal survives a tab switch', c.api.getPendingMove(), '2026-10-07');
+  ok('the choice card survives a tab switch', c.dom.get('#v').innerHTML.includes('Move this workout to'));
+  eq('the draft date is still unchanged', c.api.getD().date, '2026-10-05');
+}
+{
+  // regression: the History past-day control still starts a separate draft
+  const c = app({ seed: moveSeed() });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireClick({ a: 'tab', t: 'history' });
+  setPastDate(c, '2026-10-08');
+  c.fireClick({ a: 'past' });
+  ok('past-day entry leaves edit mode', !c.api.getD().editId);
+  eq('past-day entry opens the chosen date', c.api.getD().date, '2026-10-08');
+  eq('past-day entry clears any proposal', c.api.getPendingMove(), null);
+  eq('past-day entry leaves the edited record untouched', c.api.getS().logs.find(l => l.id === 'l1').date, '2026-10-05');
 }
 
 // =====================================================================
@@ -1092,6 +1292,7 @@ section('Fix 1 — failed save restores every workout (no stale-index corruption
   const c = app({ seed: { gym_data: JSON.stringify({ plan, logs }) }, failWrites: true });
   c.fireClick({ a: 'edit', id: 'A' });
   c.fireChange({ id: 'dt', value: '2026-10-12' }); // past, but sorts AFTER B
+  c.fireClick({ a: 'move' });
   c.fireClick({ a: 'fin' });
   eq('rollback keeps both workouts', c.api.getS().logs.map(l => l.id).sort(), ['A', 'B']);
   eq('edited workout keeps its original date after rollback', c.api.getS().logs.find(l => l.id === 'A').date, '2026-10-05');
