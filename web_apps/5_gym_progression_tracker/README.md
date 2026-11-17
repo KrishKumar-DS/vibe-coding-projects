@@ -32,6 +32,8 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 
 - **Date / day** — Use the date picker or the Mon–Sun chips. Future dates are disabled and dimmed; past dates are allowed.
 - **Past day** — From **History**, pick a past date and press **Log / edit past day**. An empty date starts a new workout for that day; a date with a saved workout opens it for editing.
+- **Moving an edit** — With a saved workout open, changing the date asks whether to **move** that workout, **start a new workout** on the chosen date, or **keep editing**. Nothing moves until **Update Workout** is pressed.
+- **Cancel edit** — **Cancel edit** abandons the draft, leaves the saved workout unchanged, and returns to History. Unsaved changes are confirmed first.
 - **Reopening on a later day** — An untouched draft from an earlier day is replaced with today's draft. A draft with entered data is kept and marked with **Start today**, so unsaved work is not lost.
 - **Sets** — Enter `kg` and reps for each set. Tick the checkbox to mark a set as completed.
 - **Add / remove sets** — `+ Set` adds a row; `✕` next to a row removes it.
@@ -105,7 +107,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-519 passed, 0 failed
+588 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
@@ -163,7 +165,7 @@ If a save fails because browser storage is full or blocked, the app shows a warn
 - **Not encrypted.** Data is stored as plain text in `localStorage`. Displayed stored text is HTML-escaped, but there is no Content Security Policy.
 - **No offline guarantee.** There is no service worker, so offline behavior is not guaranteed in a served environment. Because there are no external assets, opening the files locally does not need a network connection.
 - **Limited import recovery UI.** Invalid JSON is preserved in a recovery key, but there is no in-app button to restore it; copy the value from `localStorage` manually.
-- **Editing date changes.** Changing the date while editing still moves the saved workout; there is no Cancel Edit action yet.
+- **Pending move choice.** A chosen move is not saved until **Update Workout**; reloading before then leaves the workout on its original date. A pending choice is not carried across reloads.
 - **Basic analytics.** Progression focuses on top-set weight, estimated 1RM, session count, and workout volume.
 - **No nutrition, body-weight, RPE/RIR, rest timer, or PR detection** in this version.
 

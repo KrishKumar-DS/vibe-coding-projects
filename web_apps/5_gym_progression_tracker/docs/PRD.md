@@ -8,7 +8,7 @@
 **Target Platform:** Mobile-first responsive web; desktop supported
 **Build Step:** None
 **External Dependencies:** None
-**Automated Tests:** `node tests/run-tests.mjs` — 519 tests as of 2026-11-16
+**Automated Tests:** `node tests/run-tests.mjs` — 588 tests as of 2026-11-17
 **Document Status:** Aligned with the current implementation
 
 ---
@@ -226,7 +226,7 @@ The day chips map to dates within the same Monday-to-Sunday week as the currentl
 - Chips whose calculated date is in the future are disabled.
 - The click handler also rejects future dates defensively.
 - Selecting the currently selected weekday is a no-op.
-- When a saved workout is being edited, a day chip changes the workout date and its weekday index without reloading the routine exercise list or changing the workout's original name.
+- When a saved workout is being edited, a day chip proposes the workout's new date and weekday index instead of moving it immediately; the app offers **Move workout**, **Start new here**, or **Keep editing**. A confirmed move preserves the workout's original name and exercise list.
 - A day chip targeting a date occupied by another workout is blocked immediately with a message.
 
 ---
@@ -241,7 +241,8 @@ The application shall allow the user to select a workout date.
 - Invalid or cleared dates cause the view to re-render with the last valid date.
 - The workout weekday is derived from the selected date.
 - Selecting a date that already has a saved workout opens that workout for editing.
-- Selecting a date without a saved workout creates a new draft using that date's routine when no saved workout is being edited. While editing, choosing an empty date moves the workout being edited (see Known Limitations).
+- Selecting a date without a saved workout creates a new draft using that date's routine when no saved workout is being edited. While editing, choosing an empty date records a pending move and offers **Move workout**, **Start new here** (a separate draft on that date, leaving the saved record untouched), or **Keep editing**.
+- A pending move is not persisted; reloading keeps the draft's existing date.
 - The application prevents creating a second saved workout on the same date through the UI. Strict restore rejects duplicate dates; boot keeps the first same-date record, drops the rest, and reports the repair.
 - When editing, changing the date to a date occupied by another workout is blocked immediately by the date input and day chips, and again at save time. Editing a record on its own date remains allowed.
 
@@ -366,15 +367,16 @@ The user shall be able to open an existing workout from History and modify its r
 - The original workout ID is preserved.
 - Saving updates the original record rather than creating a duplicate.
 - The workout being edited is excluded from previous-performance lookup.
-- The date may be changed.
-- Changing the date updates the weekday index.
+- The date may be changed, but applying a move requires confirming the pending-move choice.
+- Changing the date updates the weekday index once the move is confirmed.
 - Changing the date across weekdays keeps the workout's original routine name and exercise list; the destination weekday's routine is not applied.
-- Changing the date to a date occupied by another workout is blocked by the date input and day chips.
+- **Move workout** applies the new date to the draft; the record is written only on **Update Workout**.
+- **Start new here** creates a separate draft on the proposed date and leaves the saved record untouched.
+- **Keep editing** dismisses the proposal without changing the date.
+- **Cancel edit** clears the draft, leaves the saved record unchanged, and returns to History. Unsaved changes are confirmed first.
+- Changing the date to a date occupied by another workout is blocked by the date input and day chips before a proposal is recorded.
+- **Update Workout** is blocked while a pending-move choice is unresolved.
 - A successful update clears the draft and returns to History.
-
-Current behavior and limitation:
-
-- The saved exercise list is not rebuilt when the date changes to a different weekday, so the original name and exercises stay together.
 
 ---
 
@@ -646,6 +648,7 @@ Responsibilities:
 - Mark sets complete.
 - Skip or remove exercises.
 - Add custom exercises.
+- Move an edit to another date, start a separate workout on that date, or cancel the edit.
 - Finish/update the workout.
 
 ### History
@@ -1000,16 +1003,18 @@ The interface should prioritize:
 - Day chips are horizontally scrollable when needed.
 - Future day chips are disabled and visually dimmed, with a not-allowed cursor.
 - The current weekday chip is highlighted with the accent color.
-- Changing the date while editing updates the date and weekday index without reloading the routine exercise list or changing the workout's original name.
+- Changing the date while editing opens an inline pending-move choice card instead of moving the record; the card offers **Move workout**, **Start new here**, and **Keep editing**.
 - The History past-date input is a native date control that defaults to yesterday and cannot select today or a future date.
 
 ## 11.5 Feedback and Confirmations
 
-The application uses browser dialogs:
+The application uses browser dialogs and inline choices:
 
 - `alert` for validation errors, storage failures, and confirmations.
-- `confirm` for deleting workouts and discarding unsaved changes.
+- `confirm` for deleting workouts, cancelling an edit, starting a new workout over a dirty edit draft, and discarding unsaved changes.
 - `prompt` for restore input and for backup text when clipboard access fails.
+- The edit-mode date change is an inline choice card with buttons; it is not a native dialog.
+- After a confirmed move, a note states where the workout will move when **Update Workout** is pressed.
 
 ## 11.6 Responsive Layout and Accessibility
 
@@ -1083,14 +1088,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, boot repair and default-plan fallback, strict backup validation, future/duplicate/empty log rejection, set/rep caps, checked-set saving, edit identity and date conflicts (including weekday chips), duplicate exercise and ID repair, dirty-draft detection and dirty-delete confirmation, History past-day entry, date/weekday mapping, stable exercise identity, ambiguous legacy names, prototype-key exercise names, Progress labels, storage failures (including boot, theme, and recovery-copy reporting), recovery-copy rotation, corrupt drafts, progression grouping, the pre-paint theme bootstrap, and regression flows.
+- Covers malformed storage, boot repair and default-plan fallback, strict backup validation, future/duplicate/empty log rejection, set/rep caps, checked-set saving, edit identity and date conflicts (including weekday chips), edit-mode move/start-new and Cancel edit, duplicate exercise and ID repair, dirty-draft detection and dirty-delete confirmation, History past-day entry, date/weekday mapping, stable exercise identity, ambiguous legacy names, prototype-key exercise names, Progress labels, storage failures (including boot, theme, and recovery-copy reporting), recovery-copy rotation, corrupt drafts, progression grouping, the pre-paint theme bootstrap, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-519 passed, 0 failed
+588 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1236,7 +1241,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - Negative weights are clamped to zero before saving.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
-- After today's workout is saved, Today opens it in edit mode. Use History → past day to start a separate workout on another date. Changing the date while already editing still moves the edited record, and there is no Cancel Edit action.
+- After today's workout is saved, Today opens it in edit mode. Use History → past day to start a separate workout. While editing, a date change asks whether to move the record or start a new workout on that date; **Cancel edit** abandons the edit without changing the record. A pending move is not persisted across reloads.
 - Editing a workout and changing its date across weekdays keeps the original routine name and exercise list rather than applying the destination weekday's routine.
 - History → Edit prompts before replacing an unsaved draft.
 - A draft with unsaved work from an earlier day keeps that date until the user chooses **Start today**.
@@ -1528,6 +1533,8 @@ The developer can explain:
 - [x] Planned set/rep caps for imported and routine data
 - [x] Pre-paint theme application
 - [x] Duplicate-date prevention when saving
+- [x] Explicit edit-mode move / start-new choice
+- [x] Cancel edit for saved workouts
 - [x] Dependency-free automated regression suite
 
 ## Not Implemented
@@ -1555,7 +1562,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-519 passed, 0 failed
+588 passed, 0 failed
 ```
 
 ---

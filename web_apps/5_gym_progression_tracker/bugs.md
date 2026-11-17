@@ -1,11 +1,11 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-16)
+**Date:** 2026-10-27 (last updated 2026-11-17)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **519 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **588 passed, 0 failed**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
-> The only open issue is **#20**. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
+> There are no open issues. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
 > Items keep their original numbers so existing references remain stable.
 
 ---
@@ -14,29 +14,26 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 20 | P1 | Editing/UX | Choosing a past day after saving today moves today's workout |
 
 ### Recommended next patch
 
-1. Item **20** — P1 past-day edit workflow.
+No open items remain. Future work is tracked under **Related Known Limitations** below and in `docs/PRD.md`.
 
-Resolved work is listed below. Items **18** and **21–24, 26–33** are complete; item **20** remains open.
+Resolved work is listed below. Items **18, 20–24, and 26–34** are complete.
 
 ---
 
-# Open Items
+# Resolved Items
 
-## 20. Changing the date while editing still moves the saved workout; there is no Cancel Edit path
+## 20. Changing the date while editing moved the saved workout; there was no Cancel Edit path
 
 **Priority:** P1
-**Status:** Open
-**Where:** `js/app.js` — `openDate()`, the weekday-chip handler (`a === 'day'`), the date-input change handler (`id === 'dt'`), and Finish (`a === 'fin'`)
+**Status:** Resolved
+**Where:** `js/app.js` — `openDate()`, the weekday-chip handler (`a === 'day'`), the date-input change handler (`id === 'dt'`), Finish (`a === 'fin'`), and the Today view
 
 ### Problem
 
-Once today has a saved workout, opening Today auto-loads that workout as an edit draft (`D.editId` is set). The History past-day control now starts a separate draft (fixed by item **14**), so the “no reachable past-workout entry point” half of this bug is resolved.
-
-What remains: once Today is in edit mode, choosing another date with the date picker or weekday chips still changes the existing record's date directly, with no explicit move/start-new choice and no warning. Finish then updates the original record at the new date instead of creating a new workout, and there is still no way to abandon an edit without moving or deleting the record.
+Once today had a saved workout, opening Today auto-loaded that workout as an edit draft (`D.editId` was set). Choosing another date with the date picker or weekday chips changed the existing record's date directly: no explicit move/start-new choice, no warning, and no way to abandon an edit. Finish then updated the original record at the new date instead of creating a new workout.
 
 ### Reproduction
 
@@ -45,25 +42,32 @@ What remains: once Today is in edit mode, choosing another date with the date pi
 3. Choose an empty past date with the date picker or weekday chips.
 4. Press **Update**.
 
-Result: today's workout is moved to the chosen date. No new workout is created, no move-specific warning is shown, and there is no Cancel Edit action.
+Result: today's workout was moved to the chosen date, with no new workout and no move-specific warning.
 
 ### Fix
 
-- In edit mode, distinguish “move this workout” from “start/open another workout”; make the date change explicit.
-- Warn before any destructive date move, or offer “start a new workout on this date instead”.
-- Add a Cancel Edit action so an edit can be abandoned without moving or deleting the record.
-- Keep the History past-day flow added by item **14**; it already creates a new draft and must not regress.
+- An edit-mode date change is now a transient in-memory proposal (`pendingMove`). The draft keeps its date and the record is untouched.
+- The Today view renders a choice card above the routine with three actions:
+  - **Move workout** applies the proposed date to the draft; the record still only changes on **Update Workout**.
+  - **Start new here** discards the edit draft (after the dirty-draft confirmation) and starts a separate draft on the target date with no edit link.
+  - **Keep editing** dismisses the proposal without changing anything.
+- **Cancel edit** was added to the edit banner. It discards the draft (with a confirmation when dirty), leaves the saved record untouched, and returns to History.
+- **Update Workout** is blocked while a proposal is pending.
+- After a confirmed move, Today notes that the workout moves on Update.
+- The occupied-date conflict message now refers to the real **Cancel edit** action.
+- The proposal is not persisted: reloading keeps the draft's date and drops the choice.
 
 ### Acceptance
 
-- Choosing a past date during an edit does not silently move the existing record.
-- The user is warned before any destructive date move.
-- There is a clear cancel path for an edit.
-- The History past-day control continues to create a separate workout.
+- [x] Choosing a past date during an edit does not silently move the existing record.
+- [x] The user is warned before any destructive date move.
+- [x] There is a clear cancel path for an edit.
+- [x] The History past-day control continues to create a separate workout.
+- [x] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record.
+
+Regression coverage: `tests/run-tests.mjs` section “Bugs.md 20 — edit-mode date changes require an explicit move and can be cancelled”.
 
 ---
-
-# Resolved Items
 
 ## 18. Add regression tests for the fixes above
 
@@ -102,7 +106,7 @@ Tests added for:
 - [x] Each new test was observed failing before the corresponding fix and passes after it.
 - [x] The full suite remains green.
 - [x] Test names describe the behavior, not the implementation detail.
-- [x] The suite grew from 437 to 519 passing tests.
+- [x] The suite grew from 437 to 588 passing tests.
 
 ---
 
@@ -944,7 +948,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `519 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `588 passed, 0 failed`.
 - [x] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -961,7 +965,7 @@ After applying the fixes, verify:
 - [x] README matches the updated PRD.
 - [x] First boot followed by reload keeps draft and plan identities aligned.
 - [x] The History past-day control opens the chosen past date without moving an existing workout.
-- [ ] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record. (Deferred with item **20**.)
+- [x] After today is saved, a separate past-day workout can be created from the edit-mode date controls without moving today's record.
 - [x] Corrupt/empty `gym_data` does not silently erase the default routine.
 - [x] Malformed imported exercises/sets are rejected on restore and reported on boot.
 - [x] Future-dated workouts cannot enter through restore or boot.
