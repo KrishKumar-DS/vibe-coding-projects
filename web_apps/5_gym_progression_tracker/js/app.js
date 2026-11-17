@@ -336,6 +336,9 @@ function bootState() {
 
 let S, D, tab = 'today', pick = null, planDay = null, lastKnownToday = today(), staleDraftNotice = false;
 let addName = '', addMuscle = '';
+// A proposed date change while editing. Kept in memory only: nothing moves until
+// the user explicitly confirms, and a reload leaves the draft date unchanged.
+let pendingMove = null;
 const save = () => Store.saveData(S), saveD = () => Store.saveDraft(D);
 const boot = bootState();
 S = boot.S;
@@ -402,8 +405,9 @@ function mk(e, date, skip) {
     const c = Math.min(MAX_PLANNED_SETS, Math.max(1, smin || 3));
     return { xid: e.id || '', n: e.n, m: e.m, smin, smax, rmin, rmax, on: true, sets: Array.from({ length: c }, (_, i) => ({ w: (l[i] || l[l.length - 1] || {}).w ?? '', r: '', d: false })) }
 }
-function newDraft(di, date = today()) { staleDraftNotice = false; D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
+function newDraft(di, date = today()) { pendingMove = null; staleDraftNotice = false; D = { date, di, ex: (S.plan[di]?.ex || []).map(e => mk(e, date)) }; D.base = JSON.stringify(D.ex); D.baseDate = D.date; if (!saveD()) Store.notifyStorageFailure() }
 function fromLog(l) {
+    pendingMove = null;
     staleDraftNotice = false;
     const di = wk(l.date), pl = S.plan[di]?.ex || [];
     D = {
@@ -426,7 +430,7 @@ function dateTaken(date) {
     if (editing && editing.date === date) return false;
     return S.logs.some(l => l.id !== editId && l.date === date)
 }
-const dateConflictMsg = date => `Another workout already exists on ${date}. Choose another date or cancel the edit.`;
+const dateConflictMsg = date => `Another workout already exists on ${date}. Choose another date, or use Cancel edit to stop editing this workout.`;
 // A saved workout keeps the name it was created with, even if it is later
 // moved to another weekday. New drafts use the selected weekday's routine name.
 function draftName() {
@@ -462,9 +466,9 @@ function draftHasData(d) {
     if (d.base != null) return JSON.stringify(d.ex) !== d.base;
     return d.ex.some(e => e.on === false || e.sets.some(s => s.d || +s.r > 0))
 }
-function mayDiscard() {
+function mayDiscard(msg = 'Unsaved changes on this screen will be lost. Continue?') {
     if (!draftHasData(D)) return true;
-    return confirm('Unsaved changes on this screen will be lost. Continue?')
+    return confirm(msg)
 }
 function repairDraftEditId() {
     if (!D || !D.editId) return;
@@ -490,7 +494,10 @@ function today_v() {
     }
     if (!D) openDate(today());
     const stale = staleDraftNotice && D.date < today();
-    let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="mu" style="margin-top:6px">✏️ Editing a saved workout. Changes update it.</div>' : ''}${stale ? `<div class="row" style="margin-top:8px"><span class="mu">Unfinished workout from ${fmt(D.date)}</span><button class="btn g" data-a="gotoday">Start today</button></div>` : ''}</div><div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}"${dateForWeekday(i, D.date) > today() ? ' disabled' : ''}>${d}</button>`).join('')}</div>
+    const moved = !!(D.editId && D.baseDate && D.date !== D.baseDate);
+    let h = `<h2>Workout</h2><div class="card"><div class="row" style="margin:0"><input type="date" id="dt" value="${D.date}" max="${today()}"><b style="flex:none">${FULL[wk(D.date)]} · ${D.date.slice(0, 4)}</b></div>${D.editId ? '<div class="row" style="margin-top:6px"><span class="mu">✏️ Editing a saved workout. Changes update it.</span><button class="btn g" data-a="cedit">Cancel edit</button></div>' : ''}${moved ? `<div class="mu" style="margin-top:6px">This workout moves from ${fmt(D.baseDate)} to ${fmt(D.date)} when you press Update.</div>` : ''}${stale ? `<div class="row" style="margin-top:8px"><span class="mu">Unfinished workout from ${fmt(D.date)}</span><button class="btn g" data-a="gotoday">Start today</button></div>` : ''}</div>`;
+    if (pendingMove) h += `<div class="card" style="border-color:var(--ac)"><b>Move this workout to ${fmt(pendingMove)}?</b><div class="mu">The saved workout keeps its name and exercises. Nothing changes until you press Update.</div><div class="actions"><button class="btn g" data-a="move">Move workout</button><button class="btn g" data-a="newhere">Start new here</button><button class="btn g" data-a="pkeep">Keep editing</button></div><div class="mu">Start new here leaves the saved workout on its original date and begins a separate workout on ${pendingMove}.</div></div>`;
+    h += `<div class="chips">${DAYS.map((d, i) => `<button class="chip ${i === D.di ? 'on' : ''}" data-a="day" data-i="${i}"${dateForWeekday(i, D.date) > today() ? ' disabled' : ''}>${d}</button>`).join('')}</div>
  <div class="mu" style="margin-bottom:8px">${esc(draftName() || 'No routine set')}</div>`;
     D.ex.forEach((e, i) => {
         const l = lastSets(e, D.date, D.editId);
@@ -621,10 +628,12 @@ document.addEventListener('click', async ev => {
     else if (a === 'day') {
         const nv = dateForWeekday(i, D.date);
         if (nv > today()) return; // never allow selecting a future date
-        if (nv === D.date) return;
-        if (D.editId) {
+        if (nv === D.date) pendingMove = null;
+        else if (D.editId) {
+            // A date change while editing is a proposal: the user confirms whether
+            // to move this record or start a separate workout on that date.
             if (dateTaken(nv)) { alert(dateConflictMsg(nv)); render(); return }
-            D.date = nv; D.di = wk(nv); if (!saveD()) Store.notifyStorageFailure()
+            pendingMove = nv
         }
         else { if (!mayDiscard()) { render(); return } openDate(nv) }
     }
@@ -663,6 +672,7 @@ document.addEventListener('click', async ev => {
         if (!saveD()) Store.notifyStorageFailure()
     }
     else if (a === 'fin') {
+        if (pendingMove) { alert('Choose Move workout, Start new here, or Keep editing before saving.'); return }
         const unnamed = D.ex.filter(e => e.on && !String(e.n).trim() && e.sets.some(isCompleted));
         if (unnamed.length) { alert('Name every exercise with completed sets, or remove it before finishing.'); return }
         const ex = D.ex.filter(e => e.on && String(e.n).trim()).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: Math.max(0, +s.w || 0), r: Math.max(1, Math.floor(+s.r) || 1) })) })).filter(e => e.sets.length);
@@ -678,7 +688,7 @@ document.addEventListener('click', async ev => {
         S.logs.push(rec);
         S.logs.sort(byDate);
         if (!save()) { S.logs = prevLogs; alert('Could not save to this browser\'s storage (it may be full or blocked). Your workout is kept on this screen — free up space and try again.'); return }
-        D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'
+        D = null; pendingMove = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure(); tab = 'history'
     }
     else if (a === 'edit') {
         const l = S.logs.find(x => x.id === b.dataset.id);
@@ -691,6 +701,32 @@ document.addEventListener('click', async ev => {
         if (D && D.date >= today()) return;
         if (!mayDiscard()) { render(); return }
         openDate(today()); tab = 'today'
+    }
+    else if (a === 'move') {
+        if (!pendingMove || !D || !D.editId) { pendingMove = null; render(); return }
+        const nv = pendingMove;
+        if (!isDate(nv) || nv > today()) { alert('Please choose a valid date that is not in the future.'); pendingMove = null; render(); return }
+        if (dateTaken(nv)) { alert(dateConflictMsg(nv)); render(); return } // keep the proposal: another date can be chosen
+        D.date = nv; D.di = wk(nv); pendingMove = null;
+        if (!saveD()) Store.notifyStorageFailure()
+    }
+    else if (a === 'newhere') {
+        if (!pendingMove || !D || !D.editId) { pendingMove = null; render(); return }
+        const nv = pendingMove;
+        if (!isDate(nv) || nv > today()) { alert('Please choose a valid date that is not in the future.'); pendingMove = null; render(); return }
+        if (dateTaken(nv)) { alert(dateConflictMsg(nv)); render(); return }
+        if (!mayDiscard('Discard your unsaved changes to this workout and start a new one on ' + fmt(nv) + '?')) { render(); return }
+        newDraft(wk(nv), nv) // clears pendingMove; the saved record is untouched
+    }
+    else if (a === 'pkeep') { pendingMove = null }
+    else if (a === 'cedit') {
+        if (!D || !D.editId) return;
+        if (!mayDiscard('Discard your unsaved changes to this workout? The saved record will not change.')) { render(); return }
+        D = null; pendingMove = null; staleDraftNotice = false;
+        if (!Store.saveDraft(null)) Store.notifyStorageFailure();
+        // History is the only destination that cannot immediately re-open the
+        // same record through Today's edit-mode auto-load.
+        tab = 'history'
     }
     else if (a === 'past') {
         const v = ($('#pd') || {}).value;
@@ -710,7 +746,7 @@ document.addEventListener('click', async ev => {
         const prev = S.logs;
         S.logs = S.logs.filter(l => l.id !== b.dataset.id);
         if (!save()) { S.logs = prev; alert('Could not update storage; the workout was not deleted.'); return }
-        if (D && D.editId === b.dataset.id) { D = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure() }
+        if (D && D.editId === b.dataset.id) { D = null; pendingMove = null; if (!Store.saveDraft(null)) Store.notifyStorageFailure() }
     }
     else if (a === 'pd') { planDay = i }
     else if (a === 'pdel') { S.plan[planDay].ex.splice(i, 1); if (!save()) Store.notifyStorageFailure() }
@@ -722,6 +758,7 @@ document.addEventListener('click', async ev => {
         const v = validateImport(o);
         if (!v.ok) { alert('Invalid backup: ' + v.error); return }
         if (!mayDiscard()) return;
+        pendingMove = null;
         const normalized = normalizeData(o, { fallbackPlan: false });
         S = { plan: normalized.plan, logs: normalized.logs };
         backfillXids();
@@ -778,12 +815,16 @@ document.addEventListener('change', ev => {
         const v = ev.target.value;
         if (!isDate(v)) { render(); return }
         if (v > today()) { alert('Future dates are not allowed.'); render(); return }
-        if (v === D.date) { render(); return }
+        if (v === D.date) { pendingMove = null; render(); return }
         if (D.editId) {
+            // Same rule as the weekday chips: propose, never move silently.
             if (dateTaken(v)) { alert(dateConflictMsg(v)); render(); return }
-            D.date = v; D.di = wk(v); if (!saveD()) Store.notifyStorageFailure()
+            pendingMove = v;
+            render();
+            return
         }
-        else { if (!mayDiscard()) { render(); return } openDate(v) }
+        if (!mayDiscard()) { render(); return }
+        openDate(v);
         render()
     }
 });
