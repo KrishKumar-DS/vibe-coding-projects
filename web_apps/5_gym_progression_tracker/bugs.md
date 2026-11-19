@@ -1,11 +1,11 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-17)
+**Date:** 2026-10-27 (last updated 2026-11-19)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **588 passed, 0 failed**
+**Test status:** `node tests/run-tests.mjs` → **588 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 8 open issues**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
-> There are no open issues. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
+> Open issues found in the 2026-11-19 Playwright UI pass are listed below. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
 > Items keep their original numbers so existing references remain stable.
 
 ---
@@ -14,12 +14,309 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
+| 35 | P2 | Validation | Negative weight is silently saved as `0 kg` |
+| 36 | P3 | Layout | Set checkboxes render 50–73px wide instead of 22px |
+| 37 | P3 | UX/copy | Equal min/max ranges display as "3-3 sets" |
+| 38 | P3 | Responsive | Bottom nav wraps to two lines at 320px |
+| 39 | P3 | Responsive | Date field clips at 320px on long weekday names |
+| 40 | P3 | Responsive | Reps placeholder clips at 320px |
+| 41 | P3 | Copy | History says "1 workouts" |
+| 42 | P3 | Console | Missing favicon logs a 404 on every load |
 
 ### Recommended next patch
 
-No open items remain. Future work is tracked under **Related Known Limitations** below and in `docs/PRD.md`.
+Fix #35–#42 in one pass. #36 and #40 share the same CSS root, #35 needs validation in the Finish handler, and the rest are small markup/copy/CSS changes. Add regression tests for #35, #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320.
 
 Resolved work is listed below. Items **18, 20–24, and 26–34** are complete.
+
+---
+
+# Open Items
+
+Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All eight are reproducible in the current checkout.
+
+## 35. Negative weight is silently saved as 0 kg
+
+**Priority:** P2
+**Status:** Open
+**Where:** `js/app.js` — `isCompleted()`, Finish handler (`a === 'fin'`), today-view weight input
+
+### Problem
+
+A completed set with a negative weight passes Finish validation and is persisted as `{ w: 0, r: ... }`. No warning is shown, so the user is not told that the recorded weight was changed.
+
+### Reproduction
+
+1. Open **Today** and choose **Mon**.
+2. Enter weight `-10` and reps `10` for set 1.
+3. Tick set 1 and press **Finish & Save Workout**.
+
+Result: the workout is saved with `w: 0`, and no message appears. The input's native `min="0"` constraint never fires because the app does not submit a form or call `checkValidity()`.
+
+### Fix
+
+In the Finish handler, reject completed sets whose numeric weight is negative with a specific alert such as “Weight cannot be negative. Remove the minus sign or enter 0 for bodyweight.” Keep `0` valid for bodyweight exercises. Consider focusing/fixing the offending input so the user can correct it without losing the draft.
+
+### Acceptance
+
+- [ ] A completed set with a negative weight cannot be saved.
+- [ ] The user sees a clear message naming the problem.
+- [ ] Weight `0` remains valid for bodyweight sets.
+- [ ] A regression test covers negative weight in a completed set.
+
+---
+
+## 36. Set checkboxes render far wider than intended
+
+**Priority:** P3
+**Status:** Open
+**Where:** `css/style.css` — `.row input` and `.ok`
+
+### Problem
+
+Every set checkbox is intended to be a 22×22 control, but it is stretched by the flex layout:
+
+- 390px viewport: checkbox box **73.3px wide**
+- 320px viewport: checkbox box **50px wide**
+- computed style: `flex: 1 1 0%`
+
+The visible square stays small, so the extra area is an invisible click target and steals width from the weight/reps inputs. At 320px this contributes to a clipped reps placeholder (see #40).
+
+The cause is specificity: `.row input { flex: 1; width: 0 }` outranks `.ok { width: 22px; height: 22px; flex: none }`.
+
+### Reproduction
+
+1. Open **Today** → **Mon**.
+2. Measure `input[data-f="d"]` in DevTools, or view the page at 390px/320px.
+
+Result: the element is 73px/50px wide instead of 22px.
+
+### Fix
+
+Increase the checkbox rule's specificity and keep it out of the flex distribution, for example:
+
+```css
+.row input.ok {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+}
+```
+
+Verified in-browser with an injected stylesheet: checkbox width becomes 22px, weight/reps inputs grow from 68px to 82px at 320px, and the reps placeholder becomes readable.
+
+### Acceptance
+
+- [ ] `.ok` checkboxes are exactly 22×22 at every tested viewport.
+- [ ] Weight/reps inputs receive the freed space.
+- [ ] No horizontal overflow is introduced.
+- [ ] A regression test asserts the computed checkbox size.
+
+---
+
+## 37. Equal minimum and maximum targets display as “3-3 sets”
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `rangePart()`
+
+### Problem
+
+When a planned range's minimum equals its maximum, the target label repeats the number. Default routine examples:
+
+- Incline DB Press: `3-3 sets × 8-12 reps`
+- Triceps Pushdown: `3-3 sets × 10-15 reps`
+
+The same issue would affect equal rep ranges (for example `10-10 reps`).
+
+### Reproduction
+
+1. Open **Today** and choose **Mon**.
+2. Read the target text under Incline DB Press or Triceps Pushdown.
+
+### Fix
+
+In `rangePart(min, max, unit)`, return a single value when both bounds exist and are equal:
+
+```js
+if (lo != null && hi != null) return lo === hi ? `${lo} ${unit}` : `${lo}-${hi} ${unit}`;
+```
+
+Keep the existing one-sided forms (`≤N`, `N+`) unchanged.
+
+### Acceptance
+
+- [ ] Equal bounds render as “3 sets” / “10 reps”.
+- [ ] Unequal and one-sided ranges keep their current output.
+- [ ] A regression test covers equal, unequal, and one-sided bounds.
+
+---
+
+## 38. Bottom navigation wraps to two lines at 320px
+
+**Priority:** P3
+**Status:** Open
+**Where:** `css/style.css` — `nav button`
+
+### Problem
+
+At a 320px viewport, each nav button is 80px wide and its emoji + label no longer fit on one line. The nav grows from 47px to **65px**, and “Progress” and “Routine” wrap below their icons while “Today” and “History” stay inline, producing an uneven bar. At 360px and above the nav is a single line, so this affects only the narrowest common phone width.
+
+### Reproduction
+
+1. Set the viewport to 320×568.
+2. Observe the bottom navigation.
+
+### Fix
+
+Add `white-space: nowrap` to `nav button` and tighten the type at narrow widths, for example:
+
+```css
+nav button { white-space: nowrap; }
+@media (max-width: 360px) {
+  nav button { font-size: 12px; padding-left: 2px; padding-right: 2px; }
+}
+```
+
+Optionally hide the emoji in the same breakpoint. The 90px bottom padding on `main` continues to clear the bar.
+
+### Acceptance
+
+- [ ] The nav is one line at 320px and every label remains readable.
+- [ ] No label is clipped and all four tabs stay tappable.
+- [ ] 360px+ layouts are unchanged.
+
+---
+
+## 39. Date field clips at 320px on long weekday names
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `today_v()` date row; `css/style.css` — `.row input`
+
+### Problem
+
+On the 320px viewport, the native date input is squeezed to about 126px by the adjacent `Thursday · 2026` label. The displayed value is cut off (`11/19/202` behind the calendar icon). The clipping depends on the weekday name: `Monday · 2026` fits, `Thursday · 2026` does not.
+
+### Reproduction
+
+1. Set the viewport to 320×568.
+2. Open **Today** on a Thursday (or another long weekday name).
+
+### Fix
+
+Give the date input enough intrinsic width and let the header row wrap instead of squeezing it, for example:
+
+```css
+.date-row { flex-wrap: wrap; }
+#dt { min-width: 140px; }
+```
+
+Then add the class to the date row in `today_v()`. Alternatively, render only the weekday (not the year) beside the picker at narrow widths.
+
+### Acceptance
+
+- [ ] The full date value is visible at 320px for every weekday.
+- [ ] The weekday/year label remains readable.
+- [ ] No horizontal overflow is introduced.
+
+---
+
+## 40. Reps placeholder clips at 320px
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — reps input placeholder; `css/style.css` — `.row input` / `.ok`
+
+### Problem
+
+At 320px, the planned reps hint is cut off (`12-15` renders as `12-1`, `10-15` as `10-1`). The root cause is the over-wide checkbox in #36 consuming space that should belong to the inputs.
+
+### Reproduction
+
+1. Set the viewport to 320×568.
+2. Open **Today** → **Mon**.
+3. Look at the reps placeholders on Lateral Raise or Triceps Pushdown.
+
+### Fix
+
+Fixing #36 raises the reps input from 68px to 82px at 320px and makes the placeholder readable (verified with an injected stylesheet). If further space is needed, shorten the narrow-width placeholder to `reps`.
+
+### Acceptance
+
+- [ ] Planned rep ranges are fully readable at 320px.
+- [ ] The fix does not require changing the stored range values.
+
+---
+
+## 41. History says “1 workouts”
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `hist_v()`
+
+### Problem
+
+The year heading always uses the plural noun: a single saved workout produces “2026 **1 workouts**”.
+
+### Reproduction
+
+1. Save exactly one workout.
+2. Open **History** and read the year heading.
+
+### Fix
+
+Pluralize the count:
+
+```js
+`${ls.length} ${ls.length === 1 ? 'workout' : 'workouts'}`
+```
+
+### Acceptance
+
+- [ ] One workout renders “1 workout”.
+- [ ] Zero/multiple counts keep the plural form.
+- [ ] A regression test covers both forms.
+
+---
+
+## 42. Missing favicon logs a 404 on every load
+
+**Priority:** P3
+**Status:** Open
+**Where:** `index.html`
+
+### Problem
+
+The page declares no icon, so the browser requests `/favicon.ico` and the console/server records a 404 on every load. This pollutes the console and any network monitoring during debugging; no other runtime errors were observed.
+
+### Reproduction
+
+1. Load the app with DevTools open (or watch the static server log).
+2. Observe `GET /favicon.ico 404` and a console resource error.
+
+### Fix
+
+Add an inline empty icon (or a real asset) to the document head:
+
+```html
+<link rel="icon" href="data:,">
+```
+
+### Acceptance
+
+- [ ] Loading the app produces no favicon 404.
+- [ ] No other console errors are introduced.
+
+---
+
+### Additional observations from the same Playwright pass
+
+These are already covered by **Related Known Limitations** below; they were re-confirmed but are not new open items:
+
+- **Accessible names:** set checkboxes have no name; weight/reps inputs rely on placeholders; `✕`/`🗑` buttons expose only their glyphs. The accessibility tree shows bare `checkbox` and `spinbutton "kg"` entries, which do not identify the exercise or set.
+- **Contrast:** accent orange (`#e8590c`) measures **3.28:1** on the light page background and **3.58:1** on white, below WCAG AA for the 15px text used by the ghost/primary buttons. `#c2410c` would reach about **4.75:1** on the page background and **5.18:1** on white.
+- **Native constraints are not surfaced:** number inputs declare `min`/`max`, but because the app has no form submission or `checkValidity()` call, the browser's validation UI never appears. This is the underlying reason negative weight passes (#35) and why range inputs silently normalize.
 
 ---
 
