@@ -1660,7 +1660,7 @@ const planEx = c => c.api.getS().plan[1].ex[0];
 }
 
 // =====================================================================
-section('Bug 3 — negative weights are clamped; zero and decimals stay valid');
+section('Bug 35 — negative weights are rejected; zero and decimals stay valid');
 
 // Finish the first set of today's first exercise with the given weight/reps.
 const finishSet = (weight, reps, done = true) => {
@@ -1680,8 +1680,22 @@ const finishSet = (weight, reps, done = true) => {
 }
 {
   const c = finishSet('-50', '8');
-  const saved = c.api.getS().logs[0].ex[0].sets[0];
-  eq('negative weight is clamped to 0 on save', saved.w, 0);
+  eq('negative weight is not saved', c.api.getS().logs.length, 0);
+  ok('negative weight is named in the message', c.alerts.some(a => /weight cannot be negative/i.test(a)), c.alerts);
+  ok('negative weight keeps the draft open', !!c.api.getD() && c.api.getD().ex[0].sets[0].w === '-50');
+}
+{
+  // Correcting the weight after a rejection saves the workout normally.
+  const c = app({});
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '-10' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('rejected finish does not save', c.api.getS().logs.length, 0);
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '20' });
+  c.fireClick({ a: 'fin' });
+  eq('corrected weight saves the workout', c.api.getS().logs.length, 1);
+  eq('corrected weight is preserved', c.api.getS().logs[0].ex[0].sets[0].w, 20);
 }
 {
   const c = finishSet('62.5', '8');
@@ -1692,6 +1706,43 @@ const finishSet = (weight, reps, done = true) => {
   const c = finishSet('0', '8');
   const saved = c.api.getS().logs[0].ex[0].sets[0];
   ok('zero weight remains valid', saved.w === 0 && saved.r === 8);
+}
+{
+  // A skipped exercise is not saved, so its negative weight must not block.
+  const c = app({
+    seed: {
+      gym_data: JSON.stringify({
+        plan: {
+          1: {
+            name: 'Push', ex: [
+              { id: 'bad', n: 'Bad Lift', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 },
+              { id: 'ok', n: 'Press', m: 'Chest', smin: 3, smax: 4, rmin: 6, rmax: 10 }
+            ]
+          }
+        }, logs: []
+      })
+    }
+  });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '-10' });
+  c.fireInput({ dataset: { f: 'r', i: '0', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '0', j: '0' }, checked: true });
+  c.fireClick({ a: 'tog', i: '0' });
+  c.fireInput({ dataset: { f: 'w', i: '1', j: '0' }, value: '40' });
+  c.fireInput({ dataset: { f: 'r', i: '1', j: '0' }, value: '8' });
+  c.fireInput({ dataset: { f: 'd', i: '1', j: '0' }, checked: true });
+  c.fireClick({ a: 'fin' });
+  eq('skipped negative exercise does not block the save', c.api.getS().logs.length, 1);
+  eq('only the valid exercise is saved', c.api.getS().logs[0].ex.map(e => e.n), ['Press']);
+}
+{
+  // Editing an existing workout must also reject a negative weight.
+  const existing = makeLog('l1', '2026-10-13', [{ n: 'Bench Press', m: 'Chest', sets: [{ w: 60, r: 8 }] }]);
+  const c = app({ seed: { gym_data: JSON.stringify({ plan: JSON.parse(DEFAULTS).plan, logs: [existing] }) } });
+  c.fireClick({ a: 'edit', id: 'l1' });
+  c.fireInput({ dataset: { f: 'w', i: '0', j: '0' }, value: '-10' });
+  c.fireClick({ a: 'fin' });
+  eq('edit with negative weight is rejected', c.api.getS().logs[0].ex[0].sets[0].w, 60);
+  ok('edit rejection explains the weight rule', c.alerts.some(a => /weight cannot be negative/i.test(a)), c.alerts);
 }
 {
   // isCompleted already requires reps > 0, so a negative-rep set must not save
