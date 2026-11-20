@@ -40,6 +40,19 @@ function shiftDate(date, days) {
 const yesterday = () => shiftDate(today(), -1);
 const isCompleted = s => !!s && s.d === true && +s.r > 0;
 
+// A completed set needs a non-negative weight: 0 is valid for bodyweight,
+// but a negative value must be corrected rather than silently clamped on save.
+function firstNegativeWeightSet(draft) {
+    for (let i = 0; i < draft.ex.length; i++) {
+        const e = draft.ex[i];
+        if (!e.on) continue;
+        for (let j = 0; j < e.sets.length; j++) {
+            if (isCompleted(e.sets[j]) && +e.sets[j].w < 0) return { i, j, exercise: e };
+        }
+    }
+    return null;
+}
+
 
 const ex = (n, m, a, b, c, d) => ({ id: uid(), n, m, smin: a, smax: b, rmin: c, rmax: d });
 // Planned ranges are guidance, but they must not allocate or render without a
@@ -675,6 +688,14 @@ document.addEventListener('click', async ev => {
         if (pendingMove) { alert('Choose Move workout, Start new here, or Keep editing before saving.'); return }
         const unnamed = D.ex.filter(e => e.on && !String(e.n).trim() && e.sets.some(isCompleted));
         if (unnamed.length) { alert('Name every exercise with completed sets, or remove it before finishing.'); return }
+        const badWeight = firstNegativeWeightSet(D);
+        if (badWeight) {
+            alert(`Weight cannot be negative for ${badWeight.exercise.n || 'this exercise'} (set ${badWeight.j + 1}). Enter 0 for bodyweight or remove the minus sign.`);
+            const input = document.querySelector(`input[data-f="w"][data-i="${badWeight.i}"][data-j="${badWeight.j}"]`);
+            if (input && typeof input.focus === 'function') input.focus();
+            if (input && typeof input.select === 'function') input.select();
+            return;
+        }
         const ex = D.ex.filter(e => e.on && String(e.n).trim()).map(e => ({ n: e.n, m: e.m, xid: e.xid || '', sets: e.sets.filter(isCompleted).map(s => ({ w: Math.max(0, +s.w || 0), r: Math.max(1, Math.floor(+s.r) || 1) })) })).filter(e => e.sets.length);
         if (!ex.length) { alert('Mark at least one set as completed and enter its repetitions.'); return }
         const date = D.date;
