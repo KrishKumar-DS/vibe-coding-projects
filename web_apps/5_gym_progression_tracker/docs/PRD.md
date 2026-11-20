@@ -337,7 +337,7 @@ When the user finishes a workout:
 1. Exercises marked as skipped are excluded.
 2. Exercises with no completed sets are excluded.
 3. Sets without completed status or without repetitions are excluded.
-4. Weight is converted to a number; a blank or non-numeric weight becomes `0`.
+4. Weight is converted to a number; a blank or non-numeric weight becomes `0`. A completed set with a negative weight blocks the save until it is corrected; `0` remains valid for bodyweight.
 5. Repetitions are converted to a number.
 6. At least one completed set with repetitions must remain.
 7. The date must be valid and must not be in the future.
@@ -345,7 +345,7 @@ When the user finishes a workout:
 9. The workout is stored in history.
 10. The draft is cleared after a successful save.
 
-Finish also blocks when an included exercise with completed sets has a blank name; the user must name or remove it first.
+Finish also blocks when an included exercise with completed sets has a blank name; the user must name or remove it first. It likewise blocks when a completed set has a negative weight.
 
 Saved workout fields:
 
@@ -1088,14 +1088,14 @@ The suite:
 - Stubs the DOM, `localStorage`, clipboard, alerts, confirms, and prompts.
 - Uses a fixed reference clock so date assertions are deterministic.
 - Drives the app's own click/input/change handlers.
-- Covers malformed storage, boot repair and default-plan fallback, strict backup validation, future/duplicate/empty log rejection, set/rep caps, checked-set saving, edit identity and date conflicts (including weekday chips), edit-mode move/start-new and Cancel edit, duplicate exercise and ID repair, dirty-draft detection and dirty-delete confirmation, History past-day entry, date/weekday mapping, stable exercise identity, ambiguous legacy names, prototype-key exercise names, Progress labels, storage failures (including boot, theme, and recovery-copy reporting), recovery-copy rotation, corrupt drafts, progression grouping, the pre-paint theme bootstrap, and regression flows.
+- Covers malformed storage, boot repair and default-plan fallback, strict backup validation, future/duplicate/empty log rejection, set/rep caps, non-negative weight validation at Finish, checked-set saving, edit identity and date conflicts (including weekday chips), edit-mode move/start-new and Cancel edit, duplicate exercise and ID repair, dirty-draft detection and dirty-delete confirmation, History past-day entry, date/weekday mapping, stable exercise identity, ambiguous legacy names, prototype-key exercise names, Progress labels, storage failures (including boot, theme, and recovery-copy reporting), recovery-copy rotation, corrupt drafts, progression grouping, the pre-paint theme bootstrap, and regression flows.
 - Exits with a nonzero status when any test fails.
 
 Current expected result:
 
 ```text
 ============================================================
-588 passed, 0 failed
+597 passed, 0 failed
 ```
 
 ## 12.7 Runtime Environment
@@ -1238,7 +1238,7 @@ Acceptance also requires that malformed stored data does not crash the app and t
 - A saved workout can be edited on its own date without triggering the duplicate-date conflict.
 - A set requires both a completed checkbox and repetitions to be saved.
 - A blank weight is stored as `0`.
-- Negative weights are clamped to zero before saving.
+- A completed set with a negative weight is rejected at Finish with a message naming the exercise and set; `0` remains valid for bodyweight. Boot still clamps malformed stored values to zero, and strict restore rejects sets with negative weights.
 - Negative or zero repetitions are excluded.
 - Selecting a date that already has a workout opens it for editing rather than starting a new workout.
 - After today's workout is saved, Today opens it in edit mode. Use History → past day to start a separate workout. While editing, a date change asks whether to move the record or start a new workout on that date; **Cancel edit** abandons the edit without changing the record. A pending move is not persisted across reloads.
@@ -1533,6 +1533,7 @@ The developer can explain:
 - [x] Planned set/rep caps for imported and routine data
 - [x] Pre-paint theme application
 - [x] Duplicate-date prevention when saving
+- [x] Negative-weight rejection at Finish while keeping `0` valid
 - [x] Explicit edit-mode move / start-new choice
 - [x] Cancel edit for saved workouts
 - [x] Dependency-free automated regression suite
@@ -1562,7 +1563,7 @@ The developer can explain:
 
 ```text
 node tests/run-tests.mjs
-588 passed, 0 failed
+597 passed, 0 failed
 ```
 
 ---

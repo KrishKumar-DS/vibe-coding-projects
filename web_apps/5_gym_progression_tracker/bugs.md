@@ -1,8 +1,8 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-19)
+**Date:** 2026-10-27 (last updated 2026-11-20)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **588 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 8 open issues**
+**Test status:** `node tests/run-tests.mjs` → **597 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 7 open issues**
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > Open issues found in the 2026-11-19 Playwright UI pass are listed below. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
@@ -14,7 +14,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 35 | P2 | Validation | Negative weight is silently saved as `0 kg` |
 | 36 | P3 | Layout | Set checkboxes render 50–73px wide instead of 22px |
 | 37 | P3 | UX/copy | Equal min/max ranges display as "3-3 sets" |
 | 38 | P3 | Responsive | Bottom nav wraps to two lines at 320px |
@@ -25,46 +24,15 @@
 
 ### Recommended next patch
 
-Fix #35–#42 in one pass. #36 and #40 share the same CSS root, #35 needs validation in the Finish handler, and the rest are small markup/copy/CSS changes. Add regression tests for #35, #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320.
+Fix #36–#42 in one pass. #36 and #40 share the same CSS root, and the rest are small markup/copy/CSS changes. Add regression tests for #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320.
 
-Resolved work is listed below. Items **18, 20–24, and 26–34** are complete.
+Resolved work is listed below. Items **18, 20–24, and 26–35** are complete.
 
 ---
 
 # Open Items
 
-Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All eight are reproducible in the current checkout.
-
-## 35. Negative weight is silently saved as 0 kg
-
-**Priority:** P2
-**Status:** Open
-**Where:** `js/app.js` — `isCompleted()`, Finish handler (`a === 'fin'`), today-view weight input
-
-### Problem
-
-A completed set with a negative weight passes Finish validation and is persisted as `{ w: 0, r: ... }`. No warning is shown, so the user is not told that the recorded weight was changed.
-
-### Reproduction
-
-1. Open **Today** and choose **Mon**.
-2. Enter weight `-10` and reps `10` for set 1.
-3. Tick set 1 and press **Finish & Save Workout**.
-
-Result: the workout is saved with `w: 0`, and no message appears. The input's native `min="0"` constraint never fires because the app does not submit a form or call `checkValidity()`.
-
-### Fix
-
-In the Finish handler, reject completed sets whose numeric weight is negative with a specific alert such as “Weight cannot be negative. Remove the minus sign or enter 0 for bodyweight.” Keep `0` valid for bodyweight exercises. Consider focusing/fixing the offending input so the user can correct it without losing the draft.
-
-### Acceptance
-
-- [ ] A completed set with a negative weight cannot be saved.
-- [ ] The user sees a clear message naming the problem.
-- [ ] Weight `0` remains valid for bodyweight sets.
-- [ ] A regression test covers negative weight in a completed set.
-
----
+Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All seven remaining items are reproducible in the current checkout.
 
 ## 36. Set checkboxes render far wider than intended
 
@@ -316,11 +284,47 @@ These are already covered by **Related Known Limitations** below; they were re-c
 
 - **Accessible names:** set checkboxes have no name; weight/reps inputs rely on placeholders; `✕`/`🗑` buttons expose only their glyphs. The accessibility tree shows bare `checkbox` and `spinbutton "kg"` entries, which do not identify the exercise or set.
 - **Contrast:** accent orange (`#e8590c`) measures **3.28:1** on the light page background and **3.58:1** on white, below WCAG AA for the 15px text used by the ghost/primary buttons. `#c2410c` would reach about **4.75:1** on the page background and **5.18:1** on white.
-- **Native constraints are not surfaced:** number inputs declare `min`/`max`, but because the app has no form submission or `checkValidity()` call, the browser's validation UI never appears. This is the underlying reason negative weight passes (#35) and why range inputs silently normalize.
+- **Native constraints are not surfaced:** number inputs declare `min`/`max`, but because the app has no form submission or `checkValidity()` call, the browser's validation UI never appears. The Finish handler now performs its own non-negative weight check (#35); native constraint bubbles remain unused, so range inputs still silently normalize.
 
 ---
 
 # Resolved Items
+
+## 35. Negative weight is silently saved as 0 kg
+
+**Priority:** P2
+**Status:** Resolved
+**Where:** `js/app.js` — `isCompleted()`, Finish handler (`a === 'fin'`), today-view weight input
+
+### Problem
+
+A completed set with a negative weight passed Finish validation and was persisted as `{ w: 0, r: ... }`. No warning was shown, so the user was not told that the recorded weight had been changed.
+
+### Reproduction
+
+1. Open **Today** and choose **Mon**.
+2. Enter weight `-10` and reps `10` for set 1.
+3. Tick set 1 and press **Finish & Save Workout**.
+
+Result: the workout was saved with `w: 0`, and no message appeared. The input's native `min="0"` constraint never fires because the app does not submit a form or call `checkValidity()`.
+
+### Fix
+
+- Added `firstNegativeWeightSet()`, which scans included exercises for completed sets whose numeric weight is negative.
+- Finish now blocks before building the saved record, shows `Weight cannot be negative for <exercise> (set N). Enter 0 for bodyweight or remove the minus sign.`, focuses/selects the offending input when the DOM supports it, and keeps the draft open.
+- Blank weights still become `0`; `0`, decimals, and skipped exercises are unchanged. Boot still clamps malformed stored values, and strict restore already rejects negative weights.
+- The defensive `Math.max(0, +s.w || 0)` mapping remains as a fallback and is no longer reachable through normal Finish validation.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug 35 — negative weights are rejected; zero and decimals stay valid” (rejection, correction/retry, zero and decimal weights, skipped exercise, edit mode).
+
+### Acceptance
+
+- [x] A completed set with a negative weight cannot be saved.
+- [x] The user sees a clear message naming the problem.
+- [x] Weight `0` remains valid for bodyweight sets.
+- [x] A regression test covers negative weight in a completed set.
+
+---
 
 ## 20. Changing the date while editing moved the saved workout; there was no Cancel Edit path
 
@@ -1245,7 +1249,7 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `588 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `597 passed, 0 failed`.
 - [x] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
@@ -1275,6 +1279,7 @@ After applying the fixes, verify:
 - [x] Huge set counts are capped.
 - [x] Repeated reloads do not accumulate recovery copies, and corrupt drafts are reported.
 - [x] The saved theme is applied before the first visible paint.
+- [x] A completed set with a negative weight is rejected at Finish, while `0` and decimal weights still save.
 
 ---
 

@@ -36,6 +36,7 @@ The app has no external dependencies. Serve the folder locally for reliable `loc
 - **Cancel edit** — **Cancel edit** abandons the draft, leaves the saved workout unchanged, and returns to History. Unsaved changes are confirmed first.
 - **Reopening on a later day** — An untouched draft from an earlier day is replaced with today's draft. A draft with entered data is kept and marked with **Start today**, so unsaved work is not lost.
 - **Sets** — Enter `kg` and reps for each set. Tick the checkbox to mark a set as completed.
+- **Weights** — Weights must be zero or positive. A completed set with a negative weight is rejected until it is corrected; use `0` for bodyweight.
 - **Add / remove sets** — `+ Set` adds a row; `✕` next to a row removes it.
 - **Copy weight** — `Copy weight to all` copies the first set's weight to every set in that exercise.
 - **Skip / include** — `Skip` grays out an exercise; `Include` brings it back. Skipped exercises are not saved.
@@ -107,7 +108,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-588 passed, 0 failed
+597 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.
