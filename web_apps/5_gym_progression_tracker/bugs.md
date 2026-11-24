@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-24)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **597 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 7 open issues**; static + Node harness review (2026-11-24) → **10 further open issues** (#43–#52)
+**Test status:** `node tests/run-tests.mjs` → **604 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 5 open issues**; static + Node harness review (2026-11-24) → **10 further open issues** (#43–#52)
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > Open issues found in the 2026-11-19 Playwright UI pass are listed below, followed by the 2026-11-24 static/harness review (#43–#52). Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
@@ -14,8 +14,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 36 | P3 | Layout | Set checkboxes render 50–73px wide instead of 22px |
-| 37 | P3 | UX/copy | Equal min/max ranges display as "3-3 sets" |
 | 38 | P3 | Responsive | Bottom nav wraps to two lines at 320px |
 | 39 | P3 | Responsive | Date field clips at 320px on long weekday names |
 | 40 | P3 | Responsive | Reps placeholder clips at 320px |
@@ -36,103 +34,17 @@
 
 Fix the data-integrity items first: **#43–#45** share the normalization/validation layer and can silently lose or corrupt saved workouts. Add harness regressions for each before touching the UI.
 
-Then fix **#36–#42** in one pass. #36 and #40 share the same CSS root, and the rest are small markup/copy/CSS changes. Add regression tests for #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320. The remaining items (#46–#52) are small diagnostics/validation gaps that can follow in the same release.
+Then fix **#38–#42** in one pass; they are small markup/copy/CSS changes. #36 and #37 are already resolved. Re-check #40 at 320px: the #36 checkbox fix should free enough space for the reps placeholder, but keep it open until the browser pass confirms it. Add a regression test for #41, then rerun the Playwright pass at 1280/768/390/320. The remaining items (#46–#52) are small diagnostics/validation gaps that can follow in the same release.
 
-Resolved work is listed below. Items **18, 20–24, and 26–35** are complete.
+Resolved work is listed below. Items **18, 20–24, and 26–37** are complete.
 
 ---
 
 # Open Items
 
-Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All seven remaining items are reproducible in the current checkout.
+Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All five remaining items are reproducible in the current checkout.
 
-Items **#43–#52** were added on **2026-11-24** by static review plus a Node `vm` harness (stubbed DOM/localStorage) against the current checkout. Each behavior below was reproduced in that harness. The automated suite still passes (597/597) because none of these cases are covered yet.
-
-## 36. Set checkboxes render far wider than intended
-
-**Priority:** P3
-**Status:** Open
-**Where:** `css/style.css` — `.row input` and `.ok`
-
-### Problem
-
-Every set checkbox is intended to be a 22×22 control, but it is stretched by the flex layout:
-
-- 390px viewport: checkbox box **73.3px wide**
-- 320px viewport: checkbox box **50px wide**
-- computed style: `flex: 1 1 0%`
-
-The visible square stays small, so the extra area is an invisible click target and steals width from the weight/reps inputs. At 320px this contributes to a clipped reps placeholder (see #40).
-
-The cause is specificity: `.row input { flex: 1; width: 0 }` outranks `.ok { width: 22px; height: 22px; flex: none }`.
-
-### Reproduction
-
-1. Open **Today** → **Mon**.
-2. Measure `input[data-f="d"]` in DevTools, or view the page at 390px/320px.
-
-Result: the element is 73px/50px wide instead of 22px.
-
-### Fix
-
-Increase the checkbox rule's specificity and keep it out of the flex distribution, for example:
-
-```css
-.row input.ok {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-}
-```
-
-Verified in-browser with an injected stylesheet: checkbox width becomes 22px, weight/reps inputs grow from 68px to 82px at 320px, and the reps placeholder becomes readable.
-
-### Acceptance
-
-- [ ] `.ok` checkboxes are exactly 22×22 at every tested viewport.
-- [ ] Weight/reps inputs receive the freed space.
-- [ ] No horizontal overflow is introduced.
-- [ ] A regression test asserts the computed checkbox size.
-
----
-
-## 37. Equal minimum and maximum targets display as “3-3 sets”
-
-**Priority:** P3
-**Status:** Open
-**Where:** `js/app.js` — `rangePart()`
-
-### Problem
-
-When a planned range's minimum equals its maximum, the target label repeats the number. Default routine examples:
-
-- Incline DB Press: `3-3 sets × 8-12 reps`
-- Triceps Pushdown: `3-3 sets × 10-15 reps`
-
-The same issue would affect equal rep ranges (for example `10-10 reps`).
-
-### Reproduction
-
-1. Open **Today** and choose **Mon**.
-2. Read the target text under Incline DB Press or Triceps Pushdown.
-
-### Fix
-
-In `rangePart(min, max, unit)`, return a single value when both bounds exist and are equal:
-
-```js
-if (lo != null && hi != null) return lo === hi ? `${lo} ${unit}` : `${lo}-${hi} ${unit}`;
-```
-
-Keep the existing one-sided forms (`≤N`, `N+`) unchanged.
-
-### Acceptance
-
-- [ ] Equal bounds render as “3 sets” / “10 reps”.
-- [ ] Unequal and one-sided ranges keep their current output.
-- [ ] A regression test covers equal, unequal, and one-sided bounds.
-
----
+Items **#43–#52** were added on **2026-11-24** by static review plus a Node `vm` harness (stubbed DOM/localStorage) against the current checkout. Each behavior below was reproduced in that harness. The automated suite still passes (604/604) because none of these cases are covered yet.
 
 ## 38. Bottom navigation wraps to two lines at 320px
 
@@ -594,6 +506,89 @@ Reject exercises whose name is present but not a non-empty string (or coerce onl
 ---
 
 # Resolved Items
+
+## 37. Equal minimum and maximum targets displayed as “3-3 sets”
+
+**Priority:** P3
+**Status:** Resolved
+**Where:** `js/app.js` — `rangePart()`
+
+### Problem
+
+When a planned range's minimum equalled its maximum, `rangePart()` always formatted a range, so target labels repeated the number: Incline DB Press showed `3-3 sets × 8-12 reps`, and an equal rep range would show `10-10 reps`.
+
+### Reproduction
+
+1. Open **Today** and choose **Mon**.
+2. Read the target text under Incline DB Press or Triceps Pushdown (or any exercise with equal bounds).
+
+Result: the label repeated the shared value.
+
+### Fix
+
+`rangePart()` now returns a single value when both bounds are present and equal:
+
+```js
+if (lo == null) return `≤${hi} ${unit}`;
+if (hi == null) return `${lo}+ ${unit}`;
+if (lo === hi) return `${lo} ${unit}`;
+return `${lo}-${hi} ${unit}`;
+```
+
+Equal bounds render as `3 sets` / `10 reps`; unequal (`3-4 sets`) and one-sided (`3+ sets`, `≤4 sets`) forms are unchanged.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug 37 — equal min/max targets collapse to one value”; the existing “Bugs.md 8” cases cover unequal and one-sided bounds.
+
+### Acceptance
+
+- [x] Equal bounds render as “3 sets” / “10 reps”.
+- [x] Unequal and one-sided ranges keep their current output.
+- [x] A regression test covers equal, unequal, and one-sided bounds.
+
+---
+
+## 36. Set checkboxes rendered far wider than intended
+
+**Priority:** P3
+**Status:** Resolved
+**Where:** `css/style.css` — `.row input` and `.ok`
+
+### Problem
+
+Every set checkbox was intended to be a 22×22 control, but `.row input { flex: 1; width: 0 }` had higher specificity than `.ok { width: 22px; height: 22px; flex: none }`. The checkbox stretched to 50–73px, creating a large invisible click target and stealing width from the weight/reps inputs.
+
+### Reproduction
+
+1. Open **Today** → **Mon**.
+2. Measure `input[data-f="d"]` in DevTools, or view the page at 390px/320px.
+
+Result: the element was 73px/50px wide instead of 22px.
+
+### Fix
+
+The checkbox rule now uses the compound selector `.row input.ok`, which outranks `.row input`, and keeps the control out of the flex distribution:
+
+```css
+.row input.ok {
+  accent-color: var(--ok);
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px
+}
+```
+
+`accent-color` and the 22×22 size are unchanged; only the selector specificity and flex behaviour changed.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug 36 — set checkboxes keep their 22px size”. The browser measurement and the expected #40 side effect still need the Playwright pass at 320px/390px.
+
+### Acceptance
+
+- [x] `.row input.ok` wins the cascade and pins the control to 22×22.
+- [x] The checkbox no longer participates in flex growth, so weight/reps inputs receive the freed space.
+- [x] A regression test asserts the checkbox rule.
+- [ ] Computed width and horizontal overflow re-checked in Playwright at 320px/390px.
+
+---
 
 ## 35. Negative weight is silently saved as 0 kg
 
@@ -1554,12 +1549,12 @@ Regression coverage: `tests/run-tests.mjs` section “Bugs.md 19 — first-run p
 
 After applying the fixes, verify:
 
-- [x] `node tests/run-tests.mjs` → `597 passed, 0 failed`.
+- [x] `node tests/run-tests.mjs` → `604 passed, 0 failed`.
 - [x] No HTML/CSS/JS file was changed unintentionally by documentation edits.
 - [x] Restore with a dirty draft prompts.
 - [x] Moving an edited workout to another weekday keeps a consistent name and exercise list.
 - [x] Weekday chips block occupied dates immediately while editing.
-- [x] Extra exercises show “Extra exercise” instead of `3-3 sets × - reps`.
+- [x] Extra exercises show “Extra exercise” instead of a malformed target string.
 - [x] Blank routine exercises cannot silently enter saved workouts.
 - [x] Routine bounds are whole numbers of at least 1, and minimums cannot exceed maximums.
 - [x] Injected draft/theme payloads render as text.
