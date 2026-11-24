@@ -457,6 +457,7 @@ function rangePart(min, max, unit) {
     if (lo == null && hi == null) return '';
     if (lo == null) return `≤${hi} ${unit}`;
     if (hi == null) return `${lo}+ ${unit}`;
+    if (lo === hi) return `${lo} ${unit}`;
     return `${lo}-${hi} ${unit}`;
 }
 // Show only the targets that exist, so partial routines never render
