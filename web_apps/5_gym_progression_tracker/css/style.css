@@ -207,11 +207,12 @@ button {
   opacity: .45
 }
 
-.ok {
+/* Compound selector so `.row input { flex:1; width:0 }` cannot stretch it. */
+.row input.ok {
   accent-color: var(--ok);
+  flex: 0 0 auto;
   width: 22px;
-  height: 22px;
-  flex: none
+  height: 22px
 }
 
 .pl {
