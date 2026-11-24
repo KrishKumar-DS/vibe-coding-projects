@@ -812,6 +812,17 @@ section('Bugs.md 13 — native controls follow the light/dark/system theme');
 }
 
 // =====================================================================
+section('Bug 36 — set checkboxes keep their 22px size');
+{
+  const css = readFileSync(join(__dir, '..', 'css', 'style.css'), 'utf8');
+  const rule = css.match(/\.row input\.ok\s*\{([^}]*)\}/);
+  ok('compound checkbox rule exists', !!rule);
+  ok('checkbox is not stretched', !!rule && /flex\s*:\s*0 0 auto\b/.test(rule[1]));
+  ok('checkbox width is 22px', !!rule && /width\s*:\s*22px\b/.test(rule[1]));
+  ok('checkbox height is 22px', !!rule && /height\s*:\s*22px\b/.test(rule[1]));
+}
+
+// =====================================================================
 section('Bugs.md 14 — History past-day control opens the chosen past date');
 const setPastDate = (c, v) => c.dom.set('#pd', makeEl({ id: 'pd', value: v }));
 {
@@ -1556,6 +1567,12 @@ eq('no ranges', targetOf(todayHTML({ smin: '', smax: '', rmin: '', rmax: '' })),
   addExercise(c, 'Cable Fly');
   eq('custom exercise without targets', targetOf(c.dom.get('#v').innerHTML), 'Extra exercise');
 }
+
+// =====================================================================
+section('Bug 37 — equal min/max targets collapse to one value');
+eq('equal sets', targetOf(todayHTML({ smin: 3, smax: 3, rmin: 8, rmax: 12 })), '3 sets × 8-12 reps');
+eq('equal reps', targetOf(todayHTML({ smin: 3, smax: 4, rmin: 10, rmax: 10 })), '3-4 sets × 10 reps');
+eq('equal both', targetOf(todayHTML({ smin: 3, smax: 3, rmin: 10, rmax: 10 })), '3 sets × 10 reps');
 
 // =====================================================================
 section('Bugs.md 9 — routine names and ranges are validated');
