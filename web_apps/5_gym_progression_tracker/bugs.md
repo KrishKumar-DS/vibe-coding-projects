@@ -1,11 +1,11 @@
 # Gym Progression Tracker — Bugs and Immediate Fixes
 
-**Date:** 2026-10-27 (last updated 2026-11-20)
+**Date:** 2026-10-27 (last updated 2026-11-24)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **597 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 7 open issues**
+**Test status:** `node tests/run-tests.mjs` → **597 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 7 open issues**; static + Node harness review (2026-11-24) → **10 further open issues** (#43–#52)
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
-> Open issues found in the 2026-11-19 Playwright UI pass are listed below. Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
+> Open issues found in the 2026-11-19 Playwright UI pass are listed below, followed by the 2026-11-24 static/harness review (#43–#52). Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
 > Items keep their original numbers so existing references remain stable.
 
 ---
@@ -21,10 +21,22 @@
 | 40 | P3 | Responsive | Reps placeholder clips at 320px |
 | 41 | P3 | Copy | History says "1 workouts" |
 | 42 | P3 | Console | Missing favicon logs a 404 on every load |
+| 43 | P2 | Data integrity | Fractional reps from a backup normalize to 0 and the workout vanishes on reload |
+| 44 | P2 | Restore validation | Array, empty, or out-of-range plan entries pass validation and blank the routine |
+| 45 | P2 | Input validation | Huge weights/reps are accepted, render Infinity, or save as null |
+| 46 | P3 | Recovery copy | Negative-weight repair is reported as "oversized target(s)" |
+| 47 | P3 | Data integrity | Duplicate exercise entries double-count History volume |
+| 48 | P3 | Recovery copy | A non-array routine `ex` is emptied without a warning |
+| 49 | P3 | Copy | "the default routine was restored" fires for a single day |
+| 50 | P3 | UX | A future-dated draft loads but cannot be finished |
+| 51 | P3 | UX | A checked 0-rep set is silently discarded at Finish |
+| 52 | P3 | Validation | Non-string routine names become blank exercises |
 
 ### Recommended next patch
 
-Fix #36–#42 in one pass. #36 and #40 share the same CSS root, and the rest are small markup/copy/CSS changes. Add regression tests for #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320.
+Fix the data-integrity items first: **#43–#45** share the normalization/validation layer and can silently lose or corrupt saved workouts. Add harness regressions for each before touching the UI.
+
+Then fix **#36–#42** in one pass. #36 and #40 share the same CSS root, and the rest are small markup/copy/CSS changes. Add regression tests for #36, #37, and #41, then rerun the Playwright pass at 1280/768/390/320. The remaining items (#46–#52) are small diagnostics/validation gaps that can follow in the same release.
 
 Resolved work is listed below. Items **18, 20–24, and 26–35** are complete.
 
@@ -33,6 +45,8 @@ Resolved work is listed below. Items **18, 20–24, and 26–35** are complete.
 # Open Items
 
 Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All seven remaining items are reproducible in the current checkout.
+
+Items **#43–#52** were added on **2026-11-24** by static review plus a Node `vm` harness (stubbed DOM/localStorage) against the current checkout. Each behavior below was reproduced in that harness. The automated suite still passes (597/597) because none of these cases are covered yet.
 
 ## 36. Set checkboxes render far wider than intended
 
@@ -285,6 +299,297 @@ These are already covered by **Related Known Limitations** below; they were re-c
 - **Accessible names:** set checkboxes have no name; weight/reps inputs rely on placeholders; `✕`/`🗑` buttons expose only their glyphs. The accessibility tree shows bare `checkbox` and `spinbutton "kg"` entries, which do not identify the exercise or set.
 - **Contrast:** accent orange (`#e8590c`) measures **3.28:1** on the light page background and **3.58:1** on white, below WCAG AA for the 15px text used by the ghost/primary buttons. `#c2410c` would reach about **4.75:1** on the page background and **5.18:1** on white.
 - **Native constraints are not surfaced:** number inputs declare `min`/`max`, but because the app has no form submission or `checkValidity()` call, the browser's validation UI never appears. The Finish handler now performs its own non-negative weight check (#35); native constraint bubbles remain unused, so range inputs still silently normalize.
+
+---
+
+## 43. Fractional reps from a backup normalize to 0 and vanish on reload
+
+**Priority:** P2
+**Status:** Open
+**Where:** `js/app.js` — `normLogEx()`, `isCompleted()`, Finish handler (`a === 'fin'`)
+
+### Problem
+
+`validateImport()` accepts any finite `r > 0`, including a fractional value such as `0.5`. Restore then runs `normLogEx()`, which checks `r <= 0` on the raw value but stores `r: Math.floor(r)`. A `0.5` therefore becomes `0`. The app's own `isCompleted()` requires `r > 0`, so the next boot drops that set; if it was the exercise's only set, the exercise and workout are dropped too.
+
+The Finish path handles the same input differently (`Math.max(1, Math.floor(+s.r) || 1)`), so a value typed in the UI becomes `1` while a restored value becomes `0`.
+
+### Reproduction
+
+1. Restore `{"plan":{"0":{"name":"Push","ex":[]}},"logs":[{"id":"L1","date":"2026-10-12","ex":[{"n":"Bench","m":"Chest","sets":[{"w":60,"r":0.5}]}]}]}`.
+2. Observe `Backup restored.` and the stored set `{"w":60,"r":0}`.
+3. Reload.
+
+Result: the workout disappears and a recovery alert reports the dropped workout/exercise/set entries.
+
+### Fix
+
+Normalize reps with the same rule used by Finish (`Math.max(1, Math.floor(r))`), or reject fractional reps in `validateImport()` so restore stays strict. Prefer one shared helper so boot, restore, and Finish cannot diverge.
+
+### Acceptance
+
+- [ ] A restored set with `r: 0.5` either saves `r: 1` or is rejected with a clear error.
+- [ ] No set is stored with `r <= 0`.
+- [ ] A harness test covers restore plus reload with fractional reps.
+
+---
+
+## 44. Restore accepts array, empty, or out-of-range plan entries
+
+**Priority:** P2
+**Status:** Open
+**Where:** `js/app.js` — `validateBackup()`, `normPlan()`, restore handler (`a === 'rs'`)
+
+### Problem
+
+`validateBackup()` checks `typeof p !== 'object'` for each plan entry but not `Array.isArray(p)`, so `[]` passes. `normPlan()` then treats arrays as invalid and, because restore calls `normalizeData(o, { fallbackPlan: false })`, falls back to an empty day.
+
+The validator also accepts a plan with no recognized day keys (`{}` or `{"7": ...}`), which restore turns into seven blank days. Each case reports `Backup restored.` even though the routine was silently blanked. This contradicts the comment that restore is strict and rejects bad backups.
+
+### Reproduction
+
+Restore each of these in turn:
+
+- `{"plan":{"0":[]},"logs":[]}` → day 0 becomes `{"name":"","ex":[]}`.
+- `{"plan":{},"logs":[]}` → all seven days blank.
+- `{"plan":{"7":{"name":"X","ex":[]}},"logs":[]}` → key ignored, all seven days blank.
+
+### Fix
+
+In `validateBackup()`, reject arrays for plan entries, require at least one valid day key, and reject keys outside `0–6`/full day names (or normalize them before validating). Return a specific error instead of accepting a plan that normalizes to nothing.
+
+### Acceptance
+
+- [ ] Array plan entries are rejected with a clear message.
+- [ ] Empty and out-of-range plans are rejected instead of blanking the routine.
+- [ ] A restore test asserts the existing routine is unchanged after rejection.
+
+---
+
+## 45. Huge weight or rep values are accepted and corrupt stats/data
+
+**Priority:** P2
+**Status:** Open
+**Where:** `js/app.js` — today-view inputs, Finish handler (`a === 'fin'`), `validateImport()`, `hist_v()`
+
+### Problem
+
+The weight/reps inputs declare no `max`, and Finish accepts any finite number. A large finite weight such as `1e308` is stored and then multiplied by reps for History volume, producing `Infinity` (`"Infinity kg vol"`); Progress renders labels such as `1e+308kg`.
+
+If a value parses to `Infinity`, `JSON.stringify` serializes it as `null`; on reload a huge weight silently becomes `0 kg`, and huge reps cause the whole workout to be dropped with a recovery alert. Restore accepts the same finite values because `validateImport()` only checks `Number.isFinite(w)` and `Number.isFinite(r)`.
+
+### Reproduction
+
+1. On Today, enter weight `1e308`, reps `10`, tick the set, and Finish.
+2. Open History: the volume reads `Infinity kg vol`.
+3. (Optional) Use a draft value that parses to `Infinity` (for example `1e999` in a browser that accepts it) and reload: the set is saved with `null` and later becomes `0 kg` or is dropped.
+
+### Fix
+
+Define a realistic upper bound (for example 1000 kg and 1000 reps, matching the planned-rep cap) and enforce it in the inputs (`max`), in Finish, and in `validateImport()`. Reject non-finite values with an explicit message rather than letting `JSON.stringify` turn them into `null`.
+
+### Acceptance
+
+- [ ] Out-of-range weights/reps are rejected at Finish and on restore.
+- [ ] No stored set contains `null`, `Infinity`, or `NaN`.
+- [ ] History/Progress never render `Infinity` or exponent-notation weights for accepted data.
+- [ ] Tests cover the largest accepted value and one value above it.
+
+---
+
+## 46. Negative-weight repair is reported as “oversized target(s)”
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `cappedBound()`, `normLogEx()`, `bootState()`
+
+### Problem
+
+`diag.clamped` is shared by two unrelated repairs: capping an oversized planned bound (`cappedBound()`) and clamping a negative saved weight (`normLogEx()`). `bootState()` always describes the count as “oversized target(s) were capped”, so a negative weight is reported with the wrong cause.
+
+### Reproduction
+
+1. Store `{"plan":{...},"logs":[{"date":"2026-10-12","ex":[{"n":"Bench","sets":[{"w":-5,"r":8}]}]}]}` in `localStorage.gym_data`.
+2. Reload.
+
+Result: alert `1 oversized target(s) were capped`; the stored set becomes `{"w":0,"r":8}`.
+
+### Fix
+
+Track negative-weight clamps separately (for example `diag.negativeWeights`) and report “N negative weight(s) were reset to 0” from `bootState()`. Keep the existing oversized-target message for planned bounds.
+
+### Acceptance
+
+- [ ] A negative stored weight produces a message that names the weight repair.
+- [ ] Oversized planned bounds still produce the “oversized target(s)” message.
+- [ ] A boot test asserts both messages.
+
+---
+
+## 47. Duplicate exercises in one workout double-count History
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `validateBackup()`/`validateImport()`, `hist_v()`, `prog_v()`
+
+### Problem
+
+The UI prevents the same plan exercise from appearing twice in one workout, but restore/import validation does not reject duplicate exercise entries. History sums every entry for volume, while Progress uses `.find()` and therefore counts only the first entry for a date. A restored duplicate therefore inflates volume and the exercise count but changes nothing in the chart.
+
+### Reproduction
+
+Restore a workout with two `Bench` entries: `60×10` and `50×10`.
+
+Result: History shows `2 ex · 1100 kg vol`; Progress charts the `60×10` entry only.
+
+### Fix
+
+Reject duplicates within `l.ex` in `validateBackup()` (by `xid` when present, otherwise name+muscle), or merge them during normalization and report the merge. Add a regression test that restores two same-name entries and asserts one is rejected or merged consistently.
+
+### Acceptance
+
+- [ ] A workout cannot be restored with two entries for the same exercise.
+- [ ] History volume and Progress agree for every accepted workout.
+- [ ] The rejection message identifies the duplicate exercise.
+
+---
+
+## 48. A non-array routine `ex` is emptied without a warning
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `normPlan()`
+
+### Problem
+
+`normPlan()` renders `ex: Array.isArray(p.ex) ? ... : []`. A stored day whose `ex` is not an array therefore loses all exercises, but no diagnostic counter is incremented, so `bootState()` reports that the data was readable and the loss is silent. Restore rejects this shape, so the gap is boot-only.
+
+### Reproduction
+
+Store `{"plan":{"0":{"name":"Push","ex":"oops"}},"logs":[]}` and reload.
+
+Result: day 0 becomes `{"name":"Push","ex":[]}` with no alert; the emptied plan is persisted.
+
+### Fix
+
+Count a non-array `ex` as dropped exercises (or set a dedicated diagnostic) so `bootState()` reports it, and keep the recovery copy. Consider rejecting the day rather than silently emptying it.
+
+### Acceptance
+
+- [ ] A non-array `ex` produces a repair message naming the dropped exercises.
+- [ ] A boot test covers the case and asserts the recovery copy exists.
+
+---
+
+## 49. “the default routine was restored” fires for a single day
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `normPlan()`, `bootState()`
+
+### Problem
+
+`diag.planFallback` is a single boolean set whenever any one day is malformed, but the message says the whole default routine was restored. If only day 0 was invalid, days 1–2 keep the user's routine and the message still claims a full reset.
+
+### Reproduction
+
+Store a plan with day 0 as `[]` and valid custom days 1–2, then reload.
+
+Result: alert `Readable data was normalized: the default routine was restored.`; day 0 becomes the default push day while days 1–2 remain the user's routines.
+
+### Fix
+
+Track which days fell back (for example `diag.planFallbackDays = [0]`) and report “day 0 was reset to the default routine” or “N routine day(s) were reset”. Keep the existing wording only when all seven days fall back.
+
+### Acceptance
+
+- [ ] A single-day fallback names that day.
+- [ ] A full-plan fallback keeps the “default routine” wording.
+- [ ] A boot test covers both.
+
+---
+
+## 50. A future-dated saved draft loads but cannot be finished
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `normDraft()`, `today_v()`, Finish handler (`a === 'fin'`)
+
+### Problem
+
+`normDraft()` validates only that `d.date` is a date; it does not reject or repair a future date. Today renders the date input with a `value` greater than its `max`, and Finish then refuses to save with “Please choose a valid date that is not in the future.” The draft stays open until the user manually changes the date.
+
+### Reproduction
+
+Seed `localStorage.gym_draft` with `{"date":"2026-10-20","di":1,"ex":[...]}` while “today” is `2026-10-13`, then open Today and press Finish.
+
+Result: the future date is displayed; Finish alerts and saves nothing.
+
+### Fix
+
+In `normDraft()`, clamp a future `date` to today (or discard the draft with a notice), matching the repair policy used for future logs at boot (`diag.futureLogs`).
+
+### Acceptance
+
+- [ ] A future-dated draft cannot be loaded into the editor unchanged.
+- [ ] The repair is reported or the draft is reset consistently with future-log handling.
+- [ ] A harness test covers the future-draft case.
+
+---
+
+## 51. A checked set with 0 reps is silently discarded at Finish
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `isCompleted()`, Finish handler (`a === 'fin'`)
+
+### Problem
+
+`isCompleted()` requires `r > 0`, and Finish filters sets through it without warning. A set the user explicitly ticked but left at `0`/blank reps therefore disappears from the saved workout. Blank exercise names and negative weights get explicit errors, so this silent drop is inconsistent.
+
+### Reproduction
+
+Start a workout, tick a set with weight `60` and reps `0`, tick a second set with `60 × 10`, then Finish.
+
+Result: only the `60 × 10` set is saved; no alert mentions the discarded checked set.
+
+### Fix
+
+At Finish, count checked sets whose reps are not positive and show an error naming the exercise/set, or uncheck them with an explicit notice. Ensure the user can tell the difference between “not done” and “done but invalid”.
+
+### Acceptance
+
+- [ ] Finish never silently discards a checked set.
+- [ ] The message identifies the exercise and set number.
+- [ ] A harness test covers a checked 0-rep set alongside a valid set.
+
+---
+
+## 52. Non-string routine exercise names become blank exercises
+
+**Priority:** P3
+**Status:** Open
+**Where:** `js/app.js` — `normRoutineEx()`
+
+### Problem
+
+`normRoutineEx()` accepts an entry if it has an `n` or `name` property, then converts a non-string name to `''`. An entry such as `{n: 5}` survives as a nameless routine exercise. The Routine tab shows a blank entry, and Today refuses to finish until it is named or removed.
+
+### Reproduction
+
+Store `{"plan":{"0":{"name":"Push","ex":[{"n":5}]}},"logs":[]}` and reload.
+
+Result: the routine day contains an exercise with `n: ""`; no alert is shown.
+
+### Fix
+
+Reject exercises whose name is present but not a non-empty string (or coerce only when a string is available), and count the dropped entry so boot reports it.
+
+### Acceptance
+
+- [ ] A non-string name is either rejected with a repair message or normalized to a usable string.
+- [ ] No routine exercise renders with a blank name from imported/stored data.
+- [ ] A boot test covers the case.
 
 ---
 
