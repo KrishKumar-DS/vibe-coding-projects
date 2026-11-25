@@ -823,6 +823,19 @@ section('Bug 36 — set checkboxes keep their 22px size');
 }
 
 // =====================================================================
+section('Bug 38 — bottom nav stays on one line at 320px');
+{
+  const css = readFileSync(join(__dir, '..', 'css', 'style.css'), 'utf8');
+  const rule = css.match(/nav button\s*\{([^}]*)\}/);
+  ok('nav button rule exists', !!rule);
+  ok('nav labels do not wrap', !!rule && /white-space\s*:\s*nowrap\b/.test(rule[1]));
+  const narrow = css.match(/@media\s*\(max-width:\s*359px\)\s*\{([\s\S]*?)\n\}/);
+  ok('narrow-width breakpoint exists', !!narrow);
+  ok('narrow nav type is tightened', !!narrow && /font-size\s*:\s*12px\b/.test(narrow[1]));
+  ok('narrow nav side padding is reduced', !!narrow && /padding-left\s*:\s*2px\b/.test(narrow[1]) && /padding-right\s*:\s*2px\b/.test(narrow[1]));
+}
+
+// =====================================================================
 section('Bugs.md 14 — History past-day control opens the chosen past date');
 const setPastDate = (c, v) => c.dom.set('#pd', makeEl({ id: 'pd', value: v }));
 {
