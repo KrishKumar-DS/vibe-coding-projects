@@ -108,7 +108,7 @@ Expected tail of the output:
 
 ```
 ============================================================
-597 passed, 0 failed
+609 passed, 0 failed
 ```
 
 No dependencies are required — just Node.js.

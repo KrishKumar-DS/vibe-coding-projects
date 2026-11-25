@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-27 (last updated 2026-11-24)
 **Baseline:** `docs/PRD.md` updated to match the current implementation
-**Test status:** `node tests/run-tests.mjs` → **604 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 5 open issues**; static + Node harness review (2026-11-24) → **10 further open issues** (#43–#52)
+**Test status:** `node tests/run-tests.mjs` → **609 passed, 0 failed**; Playwright UI pass (2026-11-19) → **64/72 checks passed, 5 open issues**; static + Node harness review (2026-11-24) → **10 further open issues** (#43–#52); #38 re-checked in Chromium (2026-11-25) at 320/360/390/768/1280
 **Scope of this document:** code quality, correctness, data integrity, UX, security, documentation, and test gaps
 
 > Open issues found in the 2026-11-19 Playwright UI pass are listed below, followed by the 2026-11-24 static/harness review (#43–#52). Resolved items are archived under [Resolved Items](#resolved-items), together with their regression coverage.
@@ -14,7 +14,6 @@
 
 | # | Priority | Area | Issue |
 |---|----------|------|-------|
-| 38 | P3 | Responsive | Bottom nav wraps to two lines at 320px |
 | 39 | P3 | Responsive | Date field clips at 320px on long weekday names |
 | 40 | P3 | Responsive | Reps placeholder clips at 320px |
 | 41 | P3 | Copy | History says "1 workouts" |
@@ -34,53 +33,17 @@
 
 Fix the data-integrity items first: **#43–#45** share the normalization/validation layer and can silently lose or corrupt saved workouts. Add harness regressions for each before touching the UI.
 
-Then fix **#38–#42** in one pass; they are small markup/copy/CSS changes. #36 and #37 are already resolved. Re-check #40 at 320px: the #36 checkbox fix should free enough space for the reps placeholder, but keep it open until the browser pass confirms it. Add a regression test for #41, then rerun the Playwright pass at 1280/768/390/320. The remaining items (#46–#52) are small diagnostics/validation gaps that can follow in the same release.
+Then fix **#39–#42** in one pass; they are small markup/copy/CSS changes. #36, #37, and #38 are already resolved. Re-check #40 at 320px: the #36 checkbox fix should free enough space for the reps placeholder, but keep it open until the browser pass confirms it. Add a regression test for #41, then rerun the Playwright pass at 1280/768/390/320. The remaining items (#46–#52) are small diagnostics/validation gaps that can follow in the same release.
 
-Resolved work is listed below. Items **18, 20–24, and 26–37** are complete.
+Resolved work is listed below. Items **18, 20–24, and 26–38** are complete.
 
 ---
 
 # Open Items
 
-Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). All five remaining items are reproducible in the current checkout.
+Items in this section were found by manually exercising the app through Playwright on **2026-11-19** (Chrome for Testing 140, Playwright 1.66, viewports 1280×900, 768×1024, 390×844, and 320×568). The four remaining items are reproducible in the current checkout.
 
-Items **#43–#52** were added on **2026-11-24** by static review plus a Node `vm` harness (stubbed DOM/localStorage) against the current checkout. Each behavior below was reproduced in that harness. The automated suite still passes (604/604) because none of these cases are covered yet.
-
-## 38. Bottom navigation wraps to two lines at 320px
-
-**Priority:** P3
-**Status:** Open
-**Where:** `css/style.css` — `nav button`
-
-### Problem
-
-At a 320px viewport, each nav button is 80px wide and its emoji + label no longer fit on one line. The nav grows from 47px to **65px**, and “Progress” and “Routine” wrap below their icons while “Today” and “History” stay inline, producing an uneven bar. At 360px and above the nav is a single line, so this affects only the narrowest common phone width.
-
-### Reproduction
-
-1. Set the viewport to 320×568.
-2. Observe the bottom navigation.
-
-### Fix
-
-Add `white-space: nowrap` to `nav button` and tighten the type at narrow widths, for example:
-
-```css
-nav button { white-space: nowrap; }
-@media (max-width: 360px) {
-  nav button { font-size: 12px; padding-left: 2px; padding-right: 2px; }
-}
-```
-
-Optionally hide the emoji in the same breakpoint. The 90px bottom padding on `main` continues to clear the bar.
-
-### Acceptance
-
-- [ ] The nav is one line at 320px and every label remains readable.
-- [ ] No label is clipped and all four tabs stay tappable.
-- [ ] 360px+ layouts are unchanged.
-
----
+Items **#43–#52** were added on **2026-11-24** by static review plus a Node `vm` harness (stubbed DOM/localStorage) against the current checkout. Each behavior below was reproduced in that harness. The automated suite still passes (609/609) because none of these cases are covered yet.
 
 ## 39. Date field clips at 320px on long weekday names
 
@@ -506,6 +469,52 @@ Reject exercises whose name is present but not a non-empty string (or coerce onl
 ---
 
 # Resolved Items
+
+## 38. Bottom navigation wraps to two lines at 320px
+
+**Priority:** P3
+**Status:** Resolved
+**Where:** `css/style.css` — `nav button`
+
+### Problem
+
+At a 320px viewport, each nav button was 80px wide and its emoji + label no longer fit on one line. The nav grew from 47px to **65px**, and “Progress” and “Routine” wrapped below their icons while “Today” and “History” stayed inline, producing an uneven bar. At 360px and above the nav was already a single line.
+
+### Reproduction
+
+1. Set the viewport to 320×568.
+2. Observe the bottom navigation.
+
+### Fix
+
+`nav button` now keeps its emoji + label on one line, and a narrow-width breakpoint tightens the type so all four tabs fit:
+
+```css
+nav button {
+  /* … */
+  white-space: nowrap
+}
+
+@media (max-width: 359px) {
+  nav button {
+    font-size: 12px;
+    padding-left: 2px;
+    padding-right: 2px
+  }
+}
+```
+
+The breakpoint stops at 359px so 360px and wider layouts keep the original 13px type. At 320px each tab is still 80px wide, the nav stays a single **45.8px** line, and no label overflows its button. The 90px bottom padding on `main` still clears the bar.
+
+Regression coverage: `tests/run-tests.mjs` section “Bug 38 — bottom nav stays on one line at 320px”; re-checked in Chromium at 320/360/390/768/1280 with no horizontal page overflow and no per-button content overflow.
+
+### Acceptance
+
+- [x] The nav is one line at 320px and every label remains readable.
+- [x] No label is clipped and all four tabs stay tappable.
+- [x] 360px+ layouts are unchanged.
+
+---
 
 ## 37. Equal minimum and maximum targets displayed as “3-3 sets”
 
