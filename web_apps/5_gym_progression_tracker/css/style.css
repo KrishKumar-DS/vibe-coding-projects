@@ -74,7 +74,19 @@ nav button {
   border: 0;
   color: var(--mu);
   font-weight: 600;
-  font-size: 13px
+  font-size: 13px;
+  white-space: nowrap
+}
+
+/* At 320px each tab is ~80px wide; the emoji + label cannot wrap without
+   making the bar two lines. Tighten the type so the four tabs stay on one
+   line, while leaving 360px+ layouts untouched. */
+@media (max-width: 359px) {
+  nav button {
+    font-size: 12px;
+    padding-left: 2px;
+    padding-right: 2px
+  }
 }
 
 nav button.on {
